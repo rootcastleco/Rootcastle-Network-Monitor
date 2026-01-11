@@ -39,7 +39,7 @@ Public NotInheritable Class MainPage
     Private _uptimeTimer As DispatcherTimer
     Private _isMonitoring As Boolean = False
     Private _startTime As DateTime
-    Private _random As New Random()
+    Private _correlationId As String = ""  ' Per-session correlation ID for tracing
 
     ' Recording
     Private _isRecording As Boolean = False
@@ -294,6 +294,7 @@ Public NotInheritable Class MainPage
 
         Try
             _isMonitoring = True
+            _correlationId = GenerateCorrelationId()  ' New correlation ID per session
             _startTime = DateTime.Now
             _lastBytesSent = 0
             _lastBytesReceived = 0
@@ -672,14 +673,51 @@ Public NotInheritable Class MainPage
         End Try
     End Sub
 
+    ''' <summary>
+    ''' Logs a message to the terminal output with timestamp.
+    ''' </summary>
     Private Sub LogTerminal(message As String)
+        LogStructured("INFO", "", "", message, NetworkErrorType.None, "")
+    End Sub
+
+    ''' <summary>
+    ''' Structured logging with severity, correlation ID, and error taxonomy.
+    ''' Levels: DEBUG, INFO, WARN, ERR, CRITICAL
+    ''' </summary>
+    Private Sub LogStructured(level As String, operation As String, targetId As String, message As String, Optional errorType As NetworkErrorType = NetworkErrorType.None, Optional technicalDetails As String = "")
         Try
             Dim timeStamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
-            Dim line = $"{timeStamp} - {message}" & Environment.NewLine
+            Dim cid = If(String.IsNullOrEmpty(_correlationId), "-", _correlationId.Substring(0, Math.Min(8, _correlationId.Length)))
 
-            ' XAML terminal is `TerminalOutput` (TextBlock) inside a ScrollViewer.
-            TerminalOutput.Text &= line
+            ' Build structured log line
+            Dim logLine As String
+            If String.IsNullOrEmpty(operation) AndAlso String.IsNullOrEmpty(targetId) Then
+                ' Simple format for basic messages
+                logLine = $"{timeStamp} [{level}] {message}"
+            Else
+                ' Full structured format
+                logLine = $"{timeStamp} [{cid}] [{level}] [{operation}] "
+                If Not String.IsNullOrEmpty(targetId) Then
+                    logLine &= $"[{targetId}] "
+                End If
+                logLine &= message
+                If errorType <> NetworkErrorType.None Then
+                    logLine &= $" (Error: {errorType})"
+                End If
+            End If
 
+            ' Append to terminal
+            TerminalOutput.Text &= logLine & Environment.NewLine
+
+            ' Debug output for diagnostics
+            If level = "ERR" OrElse level = "CRITICAL" Then
+                System.Diagnostics.Debug.WriteLine($"[ROOTCASTLE] {logLine}")
+                If Not String.IsNullOrEmpty(technicalDetails) Then
+                    System.Diagnostics.Debug.WriteLine($"[ROOTCASTLE] Technical: {technicalDetails}")
+                End If
+            End If
+
+            ' Auto-scroll
             If AutoScrollCheckBox IsNot Nothing AndAlso AutoScrollCheckBox.IsChecked.GetValueOrDefault(True) Then
                 TerminalScrollViewer?.ChangeView(Nothing, TerminalScrollViewer.ScrollableHeight, Nothing)
             End If
@@ -688,6 +726,13 @@ Public NotInheritable Class MainPage
             _errorCount += 1
         End Try
     End Sub
+
+    ''' <summary>
+    ''' Generates a new correlation ID for a monitoring session or scan.
+    ''' </summary>
+    Private Function GenerateCorrelationId() As String
+        Return Guid.NewGuid().ToString("N").Substring(0, 12).ToUpperInvariant()
+    End Function
 #End Region
 
 #Region "QoS Metrics"
@@ -1769,7 +1814,14 @@ Public NotInheritable Class MainPage
         Return sb.ToString()
     End Function
 
+    ''' <summary>
+    ''' Defense-grade AI request with timeout, retry/backoff, and rate limit handling.
+    ''' </summary>
     Private Async Function GetAIResponseAsync(data As String, userQuery As String) As Task(Of String)
+        Const MAX_RETRIES As Integer = 3
+        Const BASE_TIMEOUT_SECONDS As Integer = 30
+        Const MAX_BACKOFF_SECONDS As Integer = 60
+
         Try
             If String.IsNullOrEmpty(_openRouterApiKey) Then
                 Return If(_selectedLanguage = "TR",
@@ -1797,14 +1849,9 @@ OpenRouter API key is not set.
 📝 Note: You can use free models.")
             End If
 
-            Using client As New HttpClient()
-                client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_openRouterApiKey}")
-                client.DefaultRequestHeaders.Add("HTTP-Referer", "https://rootcastle.rei")
-                client.DefaultRequestHeaders.Add("X-Title", "Rootcastle Network Monitor")
-
-                Dim languagePrompt = GetLanguagePrompt()
-
-                Dim systemPrompt = $"You are SOFIA (Smart Operational Firewall Intelligence Assistant), a professional network security and analysis AI developed by Rootcastle Engineering & Innovation.
+            ' Prepare request body
+            Dim languagePrompt = GetLanguagePrompt()
+            Dim systemPrompt = $"You are SOFIA (Smart Operational Firewall Intelligence Assistant), a professional network security and analysis AI developed by Rootcastle Engineering & Innovation.
 
 ABOUT ROOTCASTLE:
 Rootcastle Engineering & Innovation is a technology-driven engineering company focused on building secure, mission-critical software systems. Founded by Batuhan Ayrıbaş, Rootcastle develops advanced cybersecurity platforms, secure IoT infrastructures, and defense-oriented software solutions designed for high-reliability environments where resilience, integrity, and data protection are non-negotiable.
@@ -1830,42 +1877,62 @@ RULES:
 - Use structured and readable format
 - Prioritize security and defense-grade thinking"
 
-                Dim userPrompt = $"USER QUERY: {userQuery}
+            Dim userPrompt = $"USER QUERY: {userQuery}
 
 NETWORK DATA:
 {data}
 
 Please analyze the network data above and provide a detailed response to the user's query."
 
-                Dim body As New JsonObject()
-                body.Add("model", JsonValue.CreateStringValue(_selectedAIModel))
+            Dim body As New JsonObject()
+            body.Add("model", JsonValue.CreateStringValue(_selectedAIModel))
 
-                Dim msgs As New JsonArray()
+            Dim msgs As New JsonArray()
+            Dim sysMsg As New JsonObject()
+            sysMsg.Add("role", JsonValue.CreateStringValue("system"))
+            sysMsg.Add("content", JsonValue.CreateStringValue(systemPrompt))
+            msgs.Add(sysMsg)
 
-                Dim sysMsg As New JsonObject()
-                sysMsg.Add("role", JsonValue.CreateStringValue("system"))
-                sysMsg.Add("content", JsonValue.CreateStringValue(systemPrompt))
-                msgs.Add(sysMsg)
+            Dim usrMsg As New JsonObject()
+            usrMsg.Add("role", JsonValue.CreateStringValue("user"))
+            usrMsg.Add("content", JsonValue.CreateStringValue(userPrompt))
+            msgs.Add(usrMsg)
 
-                Dim usrMsg As New JsonObject()
-                usrMsg.Add("role", JsonValue.CreateStringValue("user"))
-                usrMsg.Add("content", JsonValue.CreateStringValue(userPrompt))
-                msgs.Add(usrMsg)
+            body.Add("messages", msgs)
+            body.Add("max_tokens", JsonValue.CreateNumberValue(2000))
+            body.Add("temperature", JsonValue.CreateNumberValue(0.7))
 
-                body.Add("messages", msgs)
-                body.Add("max_tokens", JsonValue.CreateNumberValue(2000))
-                body.Add("temperature", JsonValue.CreateNumberValue(0.7))
+            ' Retry loop with exponential backoff
+            Dim attempt = 0
+            Dim lastError As String = ""
 
-                Dim content As New HttpStringContent(body.Stringify(), Windows.Storage.Streams.UnicodeEncoding.Utf8, "application/json")
-                Dim response = Await client.PostAsync(New Uri(OPENROUTER_API_URL), content)
-                Dim responseText = Await response.Content.ReadAsStringAsync()
+            While attempt < MAX_RETRIES
+                attempt += 1
 
-                If response.IsSuccessStatusCode Then
-                    Dim json = JsonObject.Parse(responseText)
-                    Dim choices = json.GetNamedArray("choices")
-                    If choices.Count > 0 Then
-                        Dim aiResponse = choices.GetObjectAt(0).GetNamedObject("message").GetNamedString("content")
-                        Return $"[SOFIA] 🧠 AI Analysis Report
+                Try
+                    Using client As New HttpClient()
+                        ' Set headers (NEVER log the full API key)
+                        client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_openRouterApiKey}")
+                        client.DefaultRequestHeaders.Add("HTTP-Referer", "https://rootcastle.rei")
+                        client.DefaultRequestHeaders.Add("X-Title", "Rootcastle Network Monitor")
+
+                        ' Create request with timeout
+                        Dim cts As New CancellationTokenSource(TimeSpan.FromSeconds(BASE_TIMEOUT_SECONDS))
+                        Dim content As New HttpStringContent(body.Stringify(), Windows.Storage.Streams.UnicodeEncoding.Utf8, "application/json")
+
+                        LogStructured("DEBUG", "AI_REQUEST", _selectedAIModel, $"Attempt {attempt}/{MAX_RETRIES}", NetworkErrorType.None, "")
+
+                        Dim response = Await client.PostAsync(New Uri(OPENROUTER_API_URL), content).AsTask(cts.Token)
+                        Dim responseText = Await response.Content.ReadAsStringAsync()
+
+                        ' Handle success
+                        If response.IsSuccessStatusCode Then
+                            Dim json = JsonObject.Parse(responseText)
+                            Dim choices = json.GetNamedArray("choices")
+                            If choices.Count > 0 Then
+                                Dim aiResponse = choices.GetObjectAt(0).GetNamedObject("message").GetNamedString("content")
+                                LogStructured("INFO", "AI_RESPONSE", _selectedAIModel, $"Success on attempt {attempt}", NetworkErrorType.None, "")
+                                Return $"[SOFIA] 🧠 AI Analysis Report
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 {aiResponse}
@@ -1873,10 +1940,17 @@ Please analyze the network data above and provide a detailed response to the use
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📅 {DateTime.Now:yyyy-MM-dd HH:mm:ss}
 🔧 Model: {_selectedAIModel}"
-                    End If
-                ElseIf response.StatusCode = Windows.Web.Http.HttpStatusCode.Unauthorized Then
-                    Return If(_selectedLanguage = "TR",
-                        "[SOFIA] ❌ API Key Hatası (Unauthorized)
+                            End If
+                        End If
+
+                        ' Handle specific error codes
+                        Dim statusCode = CInt(response.StatusCode)
+
+                        ' 401/403 - Invalid key (not retryable)
+                        If statusCode = 401 OrElse statusCode = 403 Then
+                            LogStructured("ERR", "AI_AUTH", _selectedAIModel, $"Authentication failed: {statusCode}", NetworkErrorType.Unauthorized, "")
+                            Return If(_selectedLanguage = "TR",
+                                "[SOFIA] ❌ API Key Hatası (Unauthorized)
 
 API anahtarınız geçersiz veya süresi dolmuş.
 
@@ -1884,7 +1958,7 @@ API anahtarınız geçersiz veya süresi dolmuş.
 1. Ayarlar (⚙️) menüsünü açın
 2. Geçerli bir OpenRouter API Key girin
 3. https://openrouter.ai/keys adresinden yeni key alabilirsiniz",
-                        "[SOFIA] ❌ API Key Error (Unauthorized)
+                                "[SOFIA] ❌ API Key Error (Unauthorized)
 
 Your API key is invalid or expired.
 
@@ -1892,13 +1966,105 @@ Your API key is invalid or expired.
 1. Open Settings (⚙️) menu
 2. Enter a valid OpenRouter API Key
 3. Get a new key from https://openrouter.ai/keys")
-                Else
-                    Return $"[SOFIA] ⚠️ API Error: {response.StatusCode}"
-                End If
+                        End If
 
-                Return If(_selectedLanguage = "TR", "[SOFIA] ⚠️ Analiz yapılamadı.", "[SOFIA] ⚠️ Analysis failed.")
-            End Using
+                        ' 429 - Rate limited (retryable with backoff)
+                        If statusCode = 429 Then
+                            LogStructured("WARN", "AI_RATELIMIT", _selectedAIModel, $"Rate limited on attempt {attempt}", NetworkErrorType.RateLimited, "")
+
+                            ' Check for Retry-After header
+                            Dim retryAfterSeconds = 5 * attempt  ' Default exponential backoff
+                            If response.Headers.ContainsKey("Retry-After") Then
+                                Dim retryAfterStr = response.Headers("Retry-After")
+                                Integer.TryParse(retryAfterStr, retryAfterSeconds)
+                                retryAfterSeconds = Math.Min(retryAfterSeconds, MAX_BACKOFF_SECONDS)
+                            End If
+
+                            ' Add jitter (0-1 second)
+                            Dim jitter = New Random().NextDouble()
+                            Dim waitMs = CInt((retryAfterSeconds + jitter) * 1000)
+
+                            If attempt < MAX_RETRIES Then
+                                Await Task.Delay(waitMs)
+                                Continue While
+                            Else
+                                Return If(_selectedLanguage = "TR",
+                                    "[SOFIA] ⚠️ Rate Limit Aşıldı
+
+OpenRouter API'ye çok fazla istek gönderildi. Lütfen birkaç dakika bekleyin ve tekrar deneyin.
+
+💡 İpucu: Ücretsiz modeller daha düşük rate limit'e sahiptir.",
+                                    "[SOFIA] ⚠️ Rate Limit Exceeded
+
+Too many requests sent to OpenRouter API. Please wait a few minutes and try again.
+
+💡 Tip: Free models have lower rate limits.")
+                            End If
+                        End If
+
+                        ' 5xx - Server error (retryable)
+                        If statusCode >= 500 Then
+                            LogStructured("WARN", "AI_SERVER_ERROR", _selectedAIModel, $"Server error {statusCode} on attempt {attempt}", NetworkErrorType.HttpError, "")
+                            lastError = $"Server error: {statusCode}"
+
+                            If attempt < MAX_RETRIES Then
+                                ' Exponential backoff with jitter
+                                Dim waitMs = CInt((Math.Pow(2, attempt) + New Random().NextDouble()) * 1000)
+                                waitMs = Math.Min(waitMs, MAX_BACKOFF_SECONDS * 1000)
+                                Await Task.Delay(waitMs)
+                                Continue While
+                            End If
+                        End If
+
+                        ' Other errors (not retryable)
+                        lastError = $"HTTP {statusCode}"
+                        LogStructured("ERR", "AI_ERROR", _selectedAIModel, $"Request failed: {statusCode}", NetworkErrorType.HttpError, responseText.Substring(0, Math.Min(200, responseText.Length)))
+                        Exit While
+
+                    End Using
+                Catch ex As OperationCanceledException
+                    LogStructured("WARN", "AI_TIMEOUT", _selectedAIModel, $"Timeout on attempt {attempt}", NetworkErrorType.Timeout, "")
+                    lastError = "Request timed out"
+
+                    If attempt < MAX_RETRIES Then
+                        ' Short backoff for timeout
+                        Await Task.Delay(CInt(1000 * attempt))
+                        Continue While
+                    End If
+                Catch ex As Exception
+                    LogStructured("ERR", "AI_EXCEPTION", _selectedAIModel, $"Exception on attempt {attempt}: {ex.Message}", NetworkErrorType.Unknown, ex.ToString())
+                    lastError = ex.Message
+
+                    If attempt < MAX_RETRIES Then
+                        Await Task.Delay(CInt(1000 * attempt))
+                        Continue While
+                    End If
+                End Try
+            End While
+
+            ' All retries exhausted
+            Return If(_selectedLanguage = "TR",
+                $"[SOFIA] ⚠️ Analiz yapılamadı
+
+{MAX_RETRIES} deneme sonrası başarısız oldu.
+Son hata: {lastError}
+
+🔧 Öneriler:
+- İnternet bağlantınızı kontrol edin
+- API anahtarınızı doğrulayın
+- Birkaç dakika sonra tekrar deneyin",
+                $"[SOFIA] ⚠️ Analysis failed
+
+Failed after {MAX_RETRIES} attempts.
+Last error: {lastError}
+
+🔧 Suggestions:
+- Check your internet connection
+- Verify your API key
+- Try again in a few minutes")
+
         Catch ex As Exception
+            LogStructured("ERR", "AI_FATAL", "", $"Fatal error: {ex.Message}", NetworkErrorType.Unknown, ex.ToString())
             Return $"[SOFIA] ❌ Error: {ex.Message}"
         End Try
     End Function

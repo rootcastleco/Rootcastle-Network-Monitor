@@ -332,11 +332,16 @@
                             </Grid>
                         </Border>
 
-                        <!-- Packet Capture -->
-                        <Border Style="{StaticResource MatrixBorderStyle}">
+                        <!-- Packet Capture (SIMULATED - UWP sandboxing prevents raw packet capture) -->
+                        <Border Style="{StaticResource MatrixBorderStyle}" BorderBrush="#FF6600">
                             <StackPanel>
                                 <Grid Margin="0,0,0,8">
-                                    <TextBlock Text="► PACKET CAPTURE" FontSize="14" Style="{StaticResource MatrixLabelStyle}"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="► PACKET CAPTURE" FontSize="14" Style="{StaticResource MatrixLabelStyle}"/>
+                                        <Border Background="#442200" CornerRadius="3" Margin="8,0,0,0" Padding="6,2">
+                                            <TextBlock Text="⚠️ SIMULATED (DEMO)" FontSize="10" Foreground="#FFAA00" FontFamily="Consolas" ToolTipService.ToolTip="UWP sandboxing prevents raw packet capture. Data is derived from traffic statistics."/>
+                                        </Border>
+                                    </StackPanel>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
                                         <TextBlock x:Name="ConnectionCountText" Text="[0 connections]" Foreground="#00FFFF" FontFamily="Consolas" FontSize="12"/>
                                         <Button Content="● REC" x:Name="RecordButton" Style="{StaticResource AlertButtonStyle}" Click="RecordButton_Click"/>

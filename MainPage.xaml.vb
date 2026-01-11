@@ -146,8 +146,12 @@ Public NotInheritable Class MainPage
             InitializeGraphData()
             InitializeTimers()
             LoadInterfaces()
+            LoadSettingsAsync()  ' Load persisted settings
             GetExternalIPAsync()
-            LogTerminal("[SYS] All systems initialized successfully")
+            LogTerminal("[SYS] Rootcastle Network Monitor v6.0")
+            LogTerminal("[SYS] Powered by Rootcastle Engineering & Innovation")
+            LogTerminal("[SYS] Defense-grade network surveillance initialized")
+            LogTerminal("[SYS] SOFIA AI Engine ready")
         Catch ex As Exception
             LogTerminal($"[ERR] Init failed: {ex.Message}")
         End Try
@@ -800,6 +804,18 @@ Public NotInheritable Class MainPage
         LogTerminal(If(_isRecording, "[REC] Recording started", "[REC] Recording stopped"))
     End Sub
 
+    Private Sub SuspiciousPacketCheckBox_Checked(sender As Object, e As RoutedEventArgs)
+        _suspiciousDetectionEnabled = True
+        SaveSettingsAsync()  ' Persist setting
+        LogTerminal("[SEC] Suspicious traffic detection ENABLED")
+    End Sub
+
+    Private Sub SuspiciousPacketCheckBox_Unchecked(sender As Object, e As RoutedEventArgs)
+        _suspiciousDetectionEnabled = False
+        SaveSettingsAsync()  ' Persist setting
+        LogTerminal("[SEC] Suspicious traffic detection DISABLED")
+    End Sub
+
     Private Sub PacketFilterTextBox_KeyDown(sender As Object, e As KeyRoutedEventArgs)
         If e.Key = Windows.System.VirtualKey.Enter Then
             ApplyFilterButton_Click(sender, Nothing)
@@ -1287,12 +1303,125 @@ Public NotInheritable Class MainPage
     End Function
 #End Region
 
+#Region "Configuration Persistence"
+    ''' <summary>
+    ''' Loads persisted settings including secure API key from PasswordVault.
+    ''' Fails gracefully - app continues with defaults if load fails.
+    ''' </summary>
+    Private Async Sub LoadSettingsAsync()
+        Try
+            Dim localSettings = ApplicationData.Current.LocalSettings
+
+            ' Load API key from PasswordVault (secure storage)
+            Try
+                Dim vault As New Windows.Security.Credentials.PasswordVault()
+                Dim credential = vault.Retrieve("RootcastleNetworkMonitor", "OpenRouterApiKey")
+                If credential IsNot Nothing Then
+                    credential.RetrievePassword()
+                    _openRouterApiKey = credential.Password
+                    LogTerminal("[CFG] API key loaded from secure storage")
+                End If
+            Catch ex As Exception
+                ' No credential stored or access denied - OK, use empty string
+                _openRouterApiKey = ""
+            End Try
+
+            ' Load other settings from LocalSettings
+            If localSettings.Values.ContainsKey("SelectedAIModel") Then
+                _selectedAIModel = localSettings.Values("SelectedAIModel").ToString()
+            End If
+
+            If localSettings.Values.ContainsKey("SelectedLanguage") Then
+                _selectedLanguage = localSettings.Values("SelectedLanguage").ToString()
+            End If
+
+            If localSettings.Values.ContainsKey("SuspiciousDetectionEnabled") Then
+                _suspiciousDetectionEnabled = CBool(localSettings.Values("SuspiciousDetectionEnabled"))
+                SuspiciousPacketCheckBox.IsChecked = _suspiciousDetectionEnabled
+            End If
+
+            ' Apply loaded settings to UI
+            UpdateAIModelInfo()
+            LogTerminal("[CFG] Settings loaded successfully")
+
+        Catch ex As Exception
+            LogTerminal($"[CFG] Settings load error (using defaults): {ex.Message}")
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' Saves settings including secure API key to PasswordVault.
+    ''' Called when settings change.
+    ''' </summary>
+    Private Async Function SaveSettingsAsync() As Task
+        Try
+            Dim localSettings = ApplicationData.Current.LocalSettings
+
+            ' Save API key to PasswordVault (secure storage)
+            If Not String.IsNullOrEmpty(_openRouterApiKey) Then
+                Try
+                    Dim vault As New Windows.Security.Credentials.PasswordVault()
+                    
+                    ' Remove existing credential if any
+                    Try
+                        Dim existing = vault.Retrieve("RootcastleNetworkMonitor", "OpenRouterApiKey")
+                        If existing IsNot Nothing Then
+                            vault.Remove(existing)
+                        End If
+                    Catch
+                        ' No existing credential - OK
+                    End Try
+
+                    ' Add new credential
+                    vault.Add(New Windows.Security.Credentials.PasswordCredential(
+                        "RootcastleNetworkMonitor",
+                        "OpenRouterApiKey",
+                        _openRouterApiKey))
+                    LogTerminal("[CFG] API key saved to secure storage")
+                Catch ex As Exception
+                    LogTerminal($"[CFG] API key save error: {ex.Message}")
+                End Try
+            End If
+
+            ' Save other settings to LocalSettings
+            localSettings.Values("SelectedAIModel") = _selectedAIModel
+            localSettings.Values("SelectedLanguage") = _selectedLanguage
+            localSettings.Values("SuspiciousDetectionEnabled") = _suspiciousDetectionEnabled
+
+            LogTerminal("[CFG] Settings saved")
+
+        Catch ex As Exception
+            LogTerminal($"[CFG] Settings save error: {ex.Message}")
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' Sets the OpenRouter API key and persists it securely.
+    ''' </summary>
+    Public Async Function SetApiKeyAsync(apiKey As String) As Task
+        If String.IsNullOrWhiteSpace(apiKey) Then
+            _openRouterApiKey = ""
+            Return
+        End If
+
+        ' Validate API key format (sk-or-v1-...)
+        apiKey = apiKey.Trim()
+        If Not apiKey.StartsWith("sk-or-") AndAlso Not apiKey.StartsWith("sk-") Then
+            LogTerminal("[CFG] Warning: API key format may be invalid")
+        End If
+
+        _openRouterApiKey = apiKey
+        Await SaveSettingsAsync()
+    End Function
+#End Region
+
 #Region "SOFIA AI"
     Private Sub AIModelComboBox_SelectionChanged(sender As Object, e As SelectionChangedEventArgs)
         Dim item = TryCast(AIModelComboBox.SelectedItem, ComboBoxItem)
         If item IsNot Nothing Then
             _selectedAIModel = item.Tag?.ToString()
             UpdateAIModelInfo()
+            SaveSettingsAsync()  ' Persist setting
             LogTerminal($"[AI] Model changed: {item.Content}")
         End If
     End Sub
@@ -1302,6 +1431,7 @@ Public NotInheritable Class MainPage
         If item IsNot Nothing Then
             _selectedLanguage = item.Tag?.ToString()
             UpdateAIModelInfo()
+            SaveSettingsAsync()  ' Persist setting
             LogTerminal($"[AI] Language changed: {item.Content}")
         End If
     End Sub
@@ -1500,23 +1630,31 @@ OpenRouter API key is not set.
 
                 Dim languagePrompt = GetLanguagePrompt()
 
-                Dim systemPrompt = $"You are SOFIA (Smart Operational Firewall Intelligence Assistant), a professional network security and analysis AI. You are the built-in AI engine of Rootcastle Network Monitor.
+                Dim systemPrompt = $"You are SOFIA (Smart Operational Firewall Intelligence Assistant), a professional network security and analysis AI developed by Rootcastle Engineering & Innovation.
+
+ABOUT ROOTCASTLE:
+Rootcastle Engineering & Innovation is a technology-driven engineering company focused on building secure, mission-critical software systems. Founded by Batuhan Ayrıbaş, Rootcastle develops advanced cybersecurity platforms, secure IoT infrastructures, and defense-oriented software solutions designed for high-reliability environments where resilience, integrity, and data protection are non-negotiable.
+
+YOUR ROLE:
+You are the built-in AI engine of Rootcastle Network Monitor v6.0, a defense-grade network surveillance and security analysis tool.
 
 TASKS:
 1. Analyze network traffic and detect anomalies
 2. Evaluate and prioritize security threats
 3. Provide firewall rules and security recommendations
-4. Support incident response
+4. Support incident response and threat hunting
 5. Suggest performance optimizations
 6. Create technical and executive reports
+7. Assess zero-trust compliance
 
 RULES:
 - {languagePrompt}
 - Explain technical details clearly
-- Provide concrete action items
+- Provide concrete, actionable recommendations
 - Indicate risk levels (Critical/High/Medium/Low)
 - Use emojis for visualization
-- Use structured and readable format"
+- Use structured and readable format
+- Prioritize security and defense-grade thinking"
 
                 Dim userPrompt = $"USER QUERY: {userQuery}
 

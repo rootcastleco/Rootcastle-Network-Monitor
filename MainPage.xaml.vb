@@ -2464,4 +2464,244 @@ Last error: {lastError}
     End Sub
 #End Region
 
+#Region "Security Automation"
+
+    Private _securityService As SecurityService = SecurityService.Instance
+    Private _isSecurityScanning As Boolean = False
+
+    ''' <summary>
+    ''' Handles security consent checkbox state change.
+    ''' </summary>
+    Private Sub SecurityConsentCheckBox_Checked(sender As Object, e As RoutedEventArgs)
+        UpdateSecurityScanButtonState()
+        LogStructured("INFO", "SECURITY_CONSENT", "", "User acknowledged legal disclaimer", NetworkErrorType.None, "")
+    End Sub
+
+    Private Sub SecurityConsentCheckBox_Unchecked(sender As Object, e As RoutedEventArgs)
+        UpdateSecurityScanButtonState()
+    End Sub
+
+    ''' <summary>
+    ''' Handles Lab Mode toggle.
+    ''' </summary>
+    Private Sub LabModeCheckBox_Checked(sender As Object, e As RoutedEventArgs)
+        _securityService.EnableLabMode()
+        LabModeStatusText.Text = "[ENABLED - Private IPs allowed]"
+        LabModeStatusText.Foreground = New SolidColorBrush(Windows.UI.ColorHelper.FromArgb(255, 0, 204, 255))
+        LogStructured("WARN", "LAB_MODE", "", "Lab Mode ENABLED - private IP ranges now allowed", NetworkErrorType.None, "")
+        
+        ' Re-validate target
+        SecurityTargetTextBox_TextChanged(Nothing, Nothing)
+    End Sub
+
+    Private Sub LabModeCheckBox_Unchecked(sender As Object, e As RoutedEventArgs)
+        _securityService.DisableLabMode()
+        LabModeStatusText.Text = "[DISABLED]"
+        LabModeStatusText.Foreground = New SolidColorBrush(Windows.UI.ColorHelper.FromArgb(255, 102, 102, 102))
+        LogStructured("INFO", "LAB_MODE", "", "Lab Mode disabled", NetworkErrorType.None, "")
+        
+        ' Re-validate target
+        SecurityTargetTextBox_TextChanged(Nothing, Nothing)
+    End Sub
+
+    ''' <summary>
+    ''' Handles security tool selection change.
+    ''' </summary>
+    Private Sub SecurityToolComboBox_SelectionChanged(sender As Object, e As SelectionChangedEventArgs)
+        Dim selectedItem = TryCast(SecurityToolComboBox.SelectedItem, ComboBoxItem)
+        If selectedItem Is Nothing Then Return
+
+        Dim toolTag = selectedItem.Tag?.ToString()
+        Dim description = ""
+
+        Select Case toolTag
+            Case "Nmap"
+                description = "Nmap: Network exploration and security auditing. Discover hosts, services, OS detection, and firewall evasion."
+            Case "SQLMap"
+                description = "SQLMap: Automatic SQL injection detection and exploitation. Supports MySQL, PostgreSQL, Oracle, MSSQL."
+            Case "WPScan"
+                description = "WPScan: WordPress security scanner. Detects vulnerable plugins, themes, and configuration issues."
+            Case "XSStrike"
+                description = "XSStrike: Advanced XSS detection suite. Fuzzing, crawling, and WAF detection."
+            Case "DNSRecon"
+                description = "DNSRecon: DNS enumeration tool. Zone transfers, subdomain brute force, cache snooping."
+            Case "Cupp"
+                description = "Cupp: Custom User Password Profiler. Generates wordlists based on target information."
+        End Select
+
+        SecurityToolDescText.Text = description
+    End Sub
+
+    ''' <summary>
+    ''' Validates target input in real-time.
+    ''' </summary>
+    Private Sub SecurityTargetTextBox_TextChanged(sender As Object, e As TextChangedEventArgs)
+        Dim target = SecurityTargetTextBox.Text.Trim()
+        
+        If String.IsNullOrEmpty(target) Then
+            SecurityTargetValidationIcon.Text = "○"
+            SecurityTargetValidationIcon.Foreground = New SolidColorBrush(Windows.UI.ColorHelper.FromArgb(255, 102, 102, 102))
+            SecurityTargetValidationText.Text = "Enter target"
+            SecurityTargetValidationText.Foreground = New SolidColorBrush(Windows.UI.ColorHelper.FromArgb(255, 102, 102, 102))
+            UpdateSecurityScanButtonState()
+            Return
+        End If
+
+        ' Validate using TargetValidator
+        Dim validation = TargetValidator.AutoValidate(target, _securityService.LabModeEnabled)
+
+        If validation.IsValid Then
+            SecurityTargetValidationIcon.Text = "✓"
+            SecurityTargetValidationIcon.Foreground = New SolidColorBrush(Windows.UI.ColorHelper.FromArgb(255, 0, 255, 0))
+            
+            If validation.IsPrivateRange Then
+                SecurityTargetValidationText.Text = "Valid (Private - Lab Mode)"
+                SecurityTargetValidationText.Foreground = New SolidColorBrush(Windows.UI.ColorHelper.FromArgb(255, 0, 204, 255))
+            Else
+                SecurityTargetValidationText.Text = "Valid"
+                SecurityTargetValidationText.Foreground = New SolidColorBrush(Windows.UI.ColorHelper.FromArgb(255, 0, 255, 0))
+            End If
+        Else
+            SecurityTargetValidationIcon.Text = "✗"
+            SecurityTargetValidationIcon.Foreground = New SolidColorBrush(Windows.UI.ColorHelper.FromArgb(255, 255, 68, 68))
+            SecurityTargetValidationText.Text = validation.ErrorMessage
+            SecurityTargetValidationText.Foreground = New SolidColorBrush(Windows.UI.ColorHelper.FromArgb(255, 255, 68, 68))
+        End If
+
+        UpdateSecurityScanButtonState()
+    End Sub
+
+    ''' <summary>
+    ''' Updates the scan button enabled state.
+    ''' </summary>
+    Private Sub UpdateSecurityScanButtonState()
+        Dim target = SecurityTargetTextBox.Text.Trim()
+        Dim hasConsent = SecurityConsentCheckBox.IsChecked.GetValueOrDefault(False)
+        Dim validation = TargetValidator.AutoValidate(target, _securityService.LabModeEnabled)
+
+        SecurityScanButton.IsEnabled = hasConsent AndAlso validation.IsValid AndAlso Not _isSecurityScanning
+    End Sub
+
+    ''' <summary>
+    ''' Starts a security scan.
+    ''' </summary>
+    Private Async Sub SecurityScanButton_Click(sender As Object, e As RoutedEventArgs)
+        Dim target = SecurityTargetTextBox.Text.Trim()
+        Dim selectedItem = TryCast(SecurityToolComboBox.SelectedItem, ComboBoxItem)
+        Dim toolTag = selectedItem?.Tag?.ToString()
+
+        If String.IsNullOrEmpty(target) OrElse String.IsNullOrEmpty(toolTag) Then
+            Return
+        End If
+
+        ' Parse tool enum
+        Dim tool As SecurityTool
+        If Not [Enum].TryParse(toolTag, tool) Then
+            LogStructured("ERR", "SECURITY_SCAN", target, "Invalid tool selection", NetworkErrorType.InvalidConfig, "")
+            Return
+        End If
+
+        ' Create authorization
+        Dim auth = _securityService.CreateAuthorization(target, tool)
+        LogStructured("INFO", "SECURITY_SCAN", target, $"Authorization created: {auth.AuthorizationId.Substring(0, 8)}...", NetworkErrorType.None, "")
+
+        ' Update UI
+        _isSecurityScanning = True
+        SecurityScanButton.IsEnabled = False
+        SecurityStopButton.IsEnabled = True
+        SecurityProgressPanel.Visibility = Visibility.Visible
+        SecurityProgressBar.Visibility = Visibility.Visible
+        SecurityScanStatusText.Text = "[SCANNING...]"
+
+        Try
+            ' Get tool configuration
+            Dim config = ToolConfiguration.GetDefault(tool)
+
+            ' Execute scan
+            Dim result = Await _securityService.ExecuteScanAsync(target, tool, config)
+
+            ' Display results
+            If result.Status = ScanStatus.Completed Then
+                SecurityScanStatusText.Text = "[COMPLETED]"
+                SecurityResultCountText.Text = $"[{result.Findings.Count} findings]"
+
+                Dim sb As New StringBuilder()
+                sb.AppendLine($"[SCAN COMPLETED] {result.Tool}")
+                sb.AppendLine($"Target: {result.Target}")
+                sb.AppendLine($"Duration: {result.DurationMs}ms")
+                sb.AppendLine($"Correlation ID: {result.CorrelationId}")
+                sb.AppendLine()
+
+                For Each finding In result.Findings
+                    sb.AppendLine($"[{finding.Severity}] {finding.Title}")
+                    sb.AppendLine($"  {finding.Description}")
+                    sb.AppendLine()
+                Next
+
+                SecurityResultsText.Text = sb.ToString()
+            Else
+                SecurityScanStatusText.Text = $"[{result.Status}]"
+                
+                Dim sb As New StringBuilder()
+                sb.AppendLine($"[SCAN {result.Status}] {result.Tool}")
+                sb.AppendLine($"Target: {result.Target}")
+                sb.AppendLine()
+
+                For Each err In result.Errors
+                    sb.AppendLine($"⚠️ {err.Code}: {err.Message}")
+                Next
+
+                SecurityResultsText.Text = sb.ToString()
+            End If
+
+            LogStructured("INFO", "SECURITY_SCAN", target, $"Scan {result.Status}: {result.Findings.Count} findings", NetworkErrorType.None, "")
+
+        Catch ex As Exception
+            SecurityScanStatusText.Text = "[ERROR]"
+            SecurityResultsText.Text = $"[ERROR] {ex.Message}"
+            LogStructured("ERR", "SECURITY_SCAN", target, $"Exception: {ex.Message}", NetworkErrorType.Unknown, ex.ToString())
+        Finally
+            _isSecurityScanning = False
+            SecurityScanButton.IsEnabled = True
+            SecurityStopButton.IsEnabled = False
+            SecurityProgressBar.Visibility = Visibility.Collapsed
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' Stops an ongoing security scan.
+    ''' </summary>
+    Private Sub SecurityStopButton_Click(sender As Object, e As RoutedEventArgs)
+        ' TODO: Implement cancellation via companion service
+        LogStructured("WARN", "SECURITY_SCAN", "", "Stop requested (not implemented)", NetworkErrorType.None, "")
+        _securityService.ClearAuthorization()
+        
+        _isSecurityScanning = False
+        SecurityScanButton.IsEnabled = True
+        SecurityStopButton.IsEnabled = False
+        SecurityProgressBar.Visibility = Visibility.Collapsed
+        SecurityScanStatusText.Text = "[STOPPED]"
+    End Sub
+
+    ''' <summary>
+    ''' Exports the audit log.
+    ''' </summary>
+    Private Async Sub SecurityExportAuditButton_Click(sender As Object, e As RoutedEventArgs)
+        Try
+            Dim path = Await _securityService.ExportAuditLogAsync()
+            
+            If path.StartsWith("Error:") Then
+                ShowAlert($"Export failed: {path}")
+            Else
+                LogStructured("INFO", "AUDIT_EXPORT", "", $"Audit log exported: {path}", NetworkErrorType.None, "")
+                ShowAlert($"Audit log exported to: {path}")
+            End If
+        Catch ex As Exception
+            ShowAlert($"Export error: {ex.Message}")
+        End Try
+    End Sub
+
+#End Region
+
 End Class
+

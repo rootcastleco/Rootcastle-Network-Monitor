@@ -136,6 +136,9 @@
     </Compile>
     <Compile Include="Models.vb" />
     <Compile Include="NetworkResult.vb" />
+    <Compile Include="SecurityModels.vb" />
+    <Compile Include="SecurityService.vb" />
+    <Compile Include="TargetValidator.vb" />
     <Compile Include="My Project\AssemblyInfo.vb" />
   </ItemGroup>
   <ItemGroup>

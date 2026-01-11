@@ -851,6 +851,185 @@ Nasıl yardımcı olabilirim?" Foreground="#00CCFF" FontFamily="Consolas" FontSi
                     </StackPanel>
                 </ScrollViewer>
             </PivotItem>
+
+            <!-- Security Automation Tab -->
+            <PivotItem>
+                <PivotItem.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="🛡️" FontSize="14"/>
+                        <TextBlock Text="SECURITY AUTOMATION" FontSize="14" Foreground="#FF4444"/>
+                    </StackPanel>
+                </PivotItem.Header>
+                <ScrollViewer>
+                    <StackPanel Margin="4" Spacing="8">
+
+                        <!-- Legal Disclaimer (Always Visible) -->
+                        <Border Background="#331100" BorderBrush="#FF4400" BorderThickness="3" CornerRadius="8" Padding="16">
+                            <StackPanel>
+                                <TextBlock Text="⚠️ LEGAL WARNING - READ BEFORE PROCEEDING" FontSize="16" Foreground="#FF6600" FontFamily="Consolas" FontWeight="Bold" Margin="0,0,0,12"/>
+                                <TextBlock TextWrapping="Wrap" Foreground="#FFAA00" FontFamily="Consolas" FontSize="11" LineHeight="18">
+                                    <Run>Unauthorized scanning or testing of networks, systems, or applications is ILLEGAL and may result in criminal prosecution under applicable laws including:</Run>
+                                    <LineBreak/>
+                                    <LineBreak/>
+                                    <Run>• Computer Fraud and Abuse Act (CFAA) - United States</Run>
+                                    <LineBreak/>
+                                    <Run>• EU Directive on Attacks against Information Systems</Run>
+                                    <LineBreak/>
+                                    <Run>• Law No. 5651 - Turkey</Run>
+                                    <LineBreak/>
+                                    <Run>• Computer Misuse Act - United Kingdom</Run>
+                                    <LineBreak/>
+                                    <LineBreak/>
+                                    <Run FontWeight="Bold">Rootcastle Engineering &amp; Innovation assumes NO LIABILITY for misuse of these tools.</Run>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Authorization Panel -->
+                        <Border Style="{StaticResource MatrixBorderStyle}" BorderBrush="#FF6600">
+                            <StackPanel>
+                                <TextBlock Text="► AUTHORIZATION REQUIRED" FontSize="14" Foreground="#FF6600" FontFamily="Consolas" FontWeight="Bold" Margin="0,0,0,12"/>
+
+                                <CheckBox x:Name="SecurityConsentCheckBox" Margin="0,0,0,12" Checked="SecurityConsentCheckBox_Checked" Unchecked="SecurityConsentCheckBox_Unchecked">
+                                    <TextBlock TextWrapping="Wrap" Foreground="#FFAA00" FontFamily="Consolas" FontSize="11" MaxWidth="500">
+                                        <Run FontWeight="Bold">I confirm that I OWN or have EXPLICIT WRITTEN AUTHORIZATION</Run>
+                                        <Run> to scan the specified target. I understand that unauthorized scanning is illegal and I accept full responsibility for my actions.</Run>
+                                    </TextBlock>
+                                </CheckBox>
+
+                                <!-- Lab Mode Toggle -->
+                                <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,8">
+                                    <CheckBox x:Name="LabModeCheckBox" Checked="LabModeCheckBox_Checked" Unchecked="LabModeCheckBox_Unchecked">
+                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                            <TextBlock Text="🔬" FontSize="14"/>
+                                            <TextBlock Text="Lab Mode (Allow Private IPs)" Foreground="#00CCFF" FontFamily="Consolas" FontSize="11"/>
+                                        </StackPanel>
+                                    </CheckBox>
+                                    <TextBlock x:Name="LabModeStatusText" Text="[DISABLED]" Foreground="#666666" FontFamily="Consolas" FontSize="10" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Tool Selection -->
+                        <Border Style="{StaticResource MatrixBorderStyle}">
+                            <StackPanel>
+                                <TextBlock Text="► SELECT SECURITY TOOL" FontSize="14" Style="{StaticResource MatrixLabelStyle}" Margin="0,0,0,12"/>
+
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel>
+                                        <TextBlock Text="Tool:" Foreground="#888888" FontFamily="Consolas" FontSize="11" Margin="0,0,0,4"/>
+                                        <ComboBox x:Name="SecurityToolComboBox" Style="{StaticResource MatrixComboBoxStyle}" SelectionChanged="SecurityToolComboBox_SelectionChanged">
+                                            <ComboBoxItem Content="🔍 Nmap - Network Scanner" Tag="Nmap" IsSelected="True"/>
+                                            <ComboBoxItem Content="💉 SQLMap - SQL Injection" Tag="SQLMap"/>
+                                            <ComboBoxItem Content="📝 WPScan - WordPress" Tag="WPScan"/>
+                                            <ComboBoxItem Content="⚡ XSStrike - XSS Detection" Tag="XSStrike"/>
+                                            <ComboBoxItem Content="🌐 DNSRecon - DNS Enum" Tag="DNSRecon"/>
+                                            <ComboBoxItem Content="🔑 Cupp - Password Profiler" Tag="Cupp"/>
+                                        </ComboBox>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                        <TextBlock Text="Tool Status:" Foreground="#888888" FontFamily="Consolas" FontSize="11" Margin="0,0,0,4"/>
+                                        <TextBlock x:Name="SecurityToolStatusText" Text="⚠️ Companion service not connected" Foreground="#FF6600" FontFamily="Consolas" FontSize="11"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBlock x:Name="SecurityToolDescText" Text="Nmap: Network exploration and security auditing. Discover hosts, services, OS detection." Foreground="#006688" FontFamily="Consolas" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Target Input -->
+                        <Border Style="{StaticResource MatrixBorderStyle}">
+                            <StackPanel>
+                                <TextBlock Text="► TARGET CONFIGURATION" FontSize="14" Style="{StaticResource MatrixLabelStyle}" Margin="0,0,0,12"/>
+
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="SecurityTargetTextBox" Style="{StaticResource MatrixTextBoxStyle}" PlaceholderText="Target: IP, domain, URL, or CIDR range (e.g., 192.168.1.0/24)" TextChanged="SecurityTargetTextBox_TextChanged"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0,0,0" Spacing="4">
+                                        <TextBlock x:Name="SecurityTargetValidationIcon" Text="○" Foreground="#666666" FontSize="16" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="SecurityTargetValidationText" Text="Enter target" Foreground="#666666" FontFamily="Consolas" FontSize="10" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button x:Name="SecurityScanButton" Content="🚀 START SCAN" Style="{StaticResource AlertButtonStyle}" Click="SecurityScanButton_Click" IsEnabled="False"/>
+                                    <Button x:Name="SecurityStopButton" Content="⏹️ STOP" Style="{StaticResource MatrixButtonStyle}" Click="SecurityStopButton_Click" IsEnabled="False"/>
+                                    <Button Content="📋 EXPORT AUDIT" Style="{StaticResource BlueButtonStyle}" Click="SecurityExportAuditButton_Click"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Scan Progress -->
+                        <Border x:Name="SecurityProgressPanel" Style="{StaticResource MatrixBorderStyle}" Visibility="Collapsed">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,8">
+                                    <TextBlock Text="► SCAN PROGRESS" FontSize="14" Style="{StaticResource MatrixLabelStyle}"/>
+                                    <TextBlock x:Name="SecurityScanStatusText" Text="[IDLE]" Foreground="#FFAA00" FontFamily="Consolas" FontSize="12" HorizontalAlignment="Right"/>
+                                </Grid>
+                                <ProgressBar x:Name="SecurityProgressBar" Height="8" Foreground="#FF6600" Background="#331100" CornerRadius="4" IsIndeterminate="True" Visibility="Collapsed"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Scan Results -->
+                        <Border Style="{StaticResource MatrixBorderStyle}" BorderBrush="#00CCFF">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,10">
+                                    <TextBlock Text="► SCAN RESULTS" FontSize="14" Foreground="#00CCFF" FontFamily="Consolas" FontWeight="Bold"/>
+                                    <TextBlock x:Name="SecurityResultCountText" Text="[0 findings]" Foreground="#00AACC" FontFamily="Consolas" FontSize="12" HorizontalAlignment="Right"/>
+                                </Grid>
+
+                                <Border Background="#001520" BorderBrush="#00AACC" BorderThickness="2" CornerRadius="8" Padding="12" MinHeight="150">
+                                    <ScrollViewer MaxHeight="300">
+                                        <TextBlock x:Name="SecurityResultsText" TextWrapping="Wrap" Foreground="#00CCFF" FontFamily="Consolas" FontSize="12" LineHeight="20">
+                                            <Run FontWeight="Bold">[SECURITY AUTOMATION FRAMEWORK]</Run>
+                                            <LineBreak/>
+                                            <LineBreak/>
+                                            <Run>This module provides orchestration for security testing tools:</Run>
+                                            <LineBreak/>
+                                            <LineBreak/>
+                                            <Run>• Nmap - Network scanning and service detection</Run>
+                                            <LineBreak/>
+                                            <Run>• SQLMap - SQL injection testing</Run>
+                                            <LineBreak/>
+                                            <Run>• WPScan - WordPress vulnerability scanning</Run>
+                                            <LineBreak/>
+                                            <Run>• XSStrike - Cross-site scripting detection</Run>
+                                            <LineBreak/>
+                                            <Run>• DNSRecon - DNS enumeration</Run>
+                                            <LineBreak/>
+                                            <Run>• Cupp - Custom password profiling</Run>
+                                            <LineBreak/>
+                                            <LineBreak/>
+                                            <Run Foreground="#FF6600">⚠️ REQUIRES: Companion security service (not connected)</Run>
+                                            <LineBreak/>
+                                            <LineBreak/>
+                                            <Run Foreground="#888888">All scans are logged with immutable audit trail.</Run>
+                                        </TextBlock>
+                                    </ScrollViewer>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- MIT License Notice -->
+                        <Border Background="#111111" BorderBrush="#333333" BorderThickness="1" CornerRadius="4" Padding="8">
+                            <TextBlock TextWrapping="Wrap" Foreground="#666666" FontFamily="Consolas" FontSize="9">
+                                <Run>This integration uses components from the fsociety framework, distributed under the MIT License.</Run>
+                                <Run> See https://github.com/Manisso/fsociety for license details.</Run>
+                            </TextBlock>
+                        </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </PivotItem>
         </Pivot>
 
         <!-- Right Panel - Terminal & Alerts -->

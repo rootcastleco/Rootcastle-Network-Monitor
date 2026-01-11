@@ -1,22 +1,17 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 
-<Package
-  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
-  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
-  IgnorableNamespaces="uap mp">
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" IgnorableNamespaces="uap mp">
 
-  <Identity
-    Name="3ec22f34-a3d5-43a4-829e-726920699964"
-    Publisher="CN=batu9"
-    Version="1.0.0.0" />
+  <Identity Name="3ec22f34-a3d5-43a4-829e-726920699964" Publisher="CN=Rootcastle Engineering" Version="6.0.0.0" />
 
   <mp:PhoneIdentity PhoneProductId="3ec22f34-a3d5-43a4-829e-726920699964" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
-    <DisplayName>App1</DisplayName>
-    <PublisherDisplayName>batu9</PublisherDisplayName>
-    <Logo>Assets\StoreLogo.png</Logo>
+    <DisplayName>Rootcastle Network Monitor</DisplayName>
+    <PublisherDisplayName>Rootcastle Engineering &amp; Innovation</PublisherDisplayName>
+    <Logo>logo.png</Logo>
   </Properties>
 
   <Dependencies>
@@ -28,22 +23,16 @@
   </Resources>
 
   <Applications>
-    <Application Id="App"
-      Executable="$targetnametoken$.exe"
-      EntryPoint="App1.App">
-      <uap:VisualElements
-        DisplayName="App1"
-        Square150x150Logo="Assets\Square150x150Logo.png"
-        Square44x44Logo="Assets\Square44x44Logo.png"
-        Description="App1"
-        BackgroundColor="transparent">
-        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png"/>
-        <uap:SplashScreen Image="Assets\SplashScreen.png" />
+    <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="App1.App">
+      <uap:VisualElements DisplayName="Rootcastle Network Monitor" Square150x150Logo="logo.png" Square44x44Logo="logo.png" Description="Defense-Grade Network Surveillance Platform with SOFIA AI" BackgroundColor="#0A0A0A">
+        <uap:DefaultTile Wide310x150Logo="logo.png" ShortName="NetMonitor"/>
+        <uap:SplashScreen Image="logo.png" BackgroundColor="#0A0A0A"/>
       </uap:VisualElements>
     </Application>
   </Applications>
 
   <Capabilities>
     <Capability Name="internetClient" />
+    <Capability Name="privateNetworkClientServer" />
   </Capabilities>
 </Package>

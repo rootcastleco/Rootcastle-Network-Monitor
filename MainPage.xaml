@@ -116,9 +116,12 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <StackPanel>
-                    <TextBlock Text="ROOTCASTLE NETWORK MONITOR" FontSize="20" FontWeight="Bold" Foreground="#00FF00" FontFamily="Consolas"/>
-                    <TextBlock Text="Powered by /REI • Enterprise Edition • SOFIA AI Inside" FontSize="11" Foreground="#008800" FontFamily="Consolas"/>
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Image Source="logo.png" Width="48" Height="48" VerticalAlignment="Center"/>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="ROOTCASTLE NETWORK MONITOR" FontSize="20" FontWeight="Bold" Foreground="#00FF00" FontFamily="Consolas"/>
+                        <TextBlock Text="Defense-Grade Surveillance • v6.0 • SOFIA AI Inside" FontSize="11" Foreground="#008800" FontFamily="Consolas"/>
+                    </StackPanel>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
                     <ComboBox x:Name="InterfaceComboBox" Width="180" Style="{StaticResource MatrixComboBoxStyle}" PlaceholderText="[SELECT INTERFACE]" SelectionChanged="InterfaceComboBox_SelectionChanged"/>

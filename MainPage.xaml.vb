@@ -1171,6 +1171,122 @@ Public NotInheritable Class MainPage
 
 #End Region
 
+#Region "Input Validation"
+    ''' <summary>
+    ''' Validates that input is a legitimate hostname or IP address.
+    ''' Blocks command injection characters and validates format.
+    ''' </summary>
+    Private Function IsValidHostOrIP(input As String) As Boolean
+        If String.IsNullOrWhiteSpace(input) Then Return False
+        If input.Length > 255 Then Return False
+
+        ' Block dangerous characters that could enable injection attacks
+        Dim forbidden As Char() = {";"c, "|"c, "&"c, "`"c, "$"c, "("c, ")"c, "{"c, "}"c, "["c, "]"c, "<"c, ">"c, "!"c, ChrW(10), ChrW(13), """"c, "'"c}
+        If input.Any(Function(c) forbidden.Contains(c)) Then Return False
+
+        ' Try parse as IP address
+        Dim ip As IPAddress = Nothing
+        If IPAddress.TryParse(input, ip) Then Return True
+
+        ' Validate as hostname per RFC 1123
+        ' Hostname can contain alphanumeric, hyphens, and dots
+        ' Each label must start/end with alphanumeric
+        Dim hostnamePattern = "^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$"
+        Return System.Text.RegularExpressions.Regex.IsMatch(input, hostnamePattern)
+    End Function
+
+    ''' <summary>
+    ''' Validates port range specification string (e.g., "22,80,443" or "1-1000").
+    ''' Returns True if empty (uses defaults) or if format is valid.
+    ''' </summary>
+    Private Function IsValidPortRange(input As String) As Boolean
+        If String.IsNullOrWhiteSpace(input) Then Return True  ' Empty = use defaults
+
+        Try
+            Dim totalPorts = 0
+            For Each part In input.Split(","c)
+                part = part.Trim()
+                If String.IsNullOrEmpty(part) Then Continue For
+
+                If part.Contains("-") Then
+                    Dim r = part.Split("-"c)
+                    If r.Length <> 2 Then Return False
+
+                    Dim startPort As Integer
+                    Dim endPort As Integer
+                    If Not Integer.TryParse(r(0).Trim(), startPort) Then Return False
+                    If Not Integer.TryParse(r(1).Trim(), endPort) Then Return False
+
+                    If startPort < 1 OrElse endPort > 65535 OrElse startPort > endPort Then Return False
+                    If endPort - startPort > 1000 Then Return False  ' Limit range size to prevent DoS
+
+                    totalPorts += (endPort - startPort + 1)
+                Else
+                    Dim port As Integer
+                    If Not Integer.TryParse(part, port) Then Return False
+                    If port < 1 OrElse port > 65535 Then Return False
+                    totalPorts += 1
+                End If
+            Next
+
+            ' Limit total ports to prevent resource exhaustion
+            Return totalPorts <= 2000
+        Catch
+            Return False
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' Sanitizes user input by trimming whitespace and limiting length.
+    ''' </summary>
+    Private Function SanitizeInput(input As String) As String
+        If String.IsNullOrEmpty(input) Then Return ""
+        Return input.Trim().Substring(0, Math.Min(input.Trim().Length, 255))
+    End Function
+
+    ''' <summary>
+    ''' Validates CIDR notation or IP range format.
+    ''' </summary>
+    Private Function IsValidTargetRange(input As String) As Boolean
+        If String.IsNullOrWhiteSpace(input) Then Return False
+
+        input = SanitizeInput(input)
+
+        ' Single IP
+        Dim ip As IPAddress = Nothing
+        If IPAddress.TryParse(input, ip) Then Return True
+
+        ' CIDR notation (only /24 supported for safety)
+        If input.EndsWith("/24") Then
+            Dim baseIP = input.Replace("/24", "").Trim()
+            If IPAddress.TryParse(baseIP, ip) Then Return True
+        End If
+
+        ' IP range (e.g., 192.168.1.1-254)
+        If input.Contains("-") Then
+            Dim parts = input.Split("."c)
+            If parts.Length = 4 AndAlso parts(3).Contains("-") Then
+                Dim rangeParts = parts(3).Split("-"c)
+                If rangeParts.Length = 2 Then
+                    Dim startIP As Integer
+                    Dim endIP As Integer
+                    If Integer.TryParse(rangeParts(0).Trim(), startIP) AndAlso
+                       Integer.TryParse(rangeParts(1).Trim(), endIP) Then
+                        If startIP >= 1 AndAlso endIP <= 254 AndAlso startIP <= endIP Then
+                            ' Validate base IP
+                            Dim baseIPStr = $"{parts(0)}.{parts(1)}.{parts(2)}.1"
+                            Return IPAddress.TryParse(baseIPStr, ip)
+                        End If
+                    End If
+                End If
+            End If
+        End If
+
+        ' Hostname validation
+        Return IsValidHostOrIP(input)
+    End Function
+#End Region
+
 #Region "SOFIA AI"
     Private Sub AIModelComboBox_SelectionChanged(sender As Object, e As SelectionChangedEventArgs)
         Dim item = TryCast(AIModelComboBox.SelectedItem, ComboBoxItem)

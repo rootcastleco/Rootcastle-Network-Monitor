@@ -28,6 +28,7 @@ Built with a distinctive Matrix-themed UI, it provides network administrators, s
 ## ✨ Key Features
 
 ### 📡 Live Network Monitoring
+
 - **Interface Selection**: Automatic detection of all active network interfaces
 - **Real-time Throughput**: Live IN/OUT bandwidth monitoring with visual graphs
 - **Traffic Visualization**: Animated topology view showing data flow direction
@@ -35,6 +36,7 @@ Built with a distinctive Matrix-themed UI, it provides network administrators, s
 - **Protocol Distribution**: TCP/UDP/ICMP/Other packet breakdown with live counters
 
 ### 📊 Traffic Analysis
+
 - **Bandwidth Usage**: Percentage-based utilization display
 - **Traffic History**: 60-point rolling graph visualization
 - **Top Talkers**: Identification of highest traffic-generating hosts
@@ -42,6 +44,7 @@ Built with a distinctive Matrix-themed UI, it provides network administrators, s
 - **Conversation Tracking**: Host-to-host communication monitoring
 
 ### 🔍 NMAP-Style Network Scanner
+
 - **Multiple Scan Types**:
   - Quick Scan (common ports)
   - Full Scan (1-1024)
@@ -57,6 +60,7 @@ Built with a distinctive Matrix-themed UI, it provides network administrators, s
 - **OS Fingerprinting**: TTL-based operating system detection
 
 ### 📦 Packet Capture & Analysis
+
 - **Live Packet Log**: Real-time packet capture display
 - **Connection Tracking**: Active connection list with protocol/endpoint info
 - **Packet Details**: Expandable view for individual packet inspection
@@ -64,6 +68,7 @@ Built with a distinctive Matrix-themed UI, it provides network administrators, s
 - **Filter Support**: Protocol-based and custom expression filtering
 
 ### 🛡️ Security & Threat Detection
+
 - **Suspicious Traffic Detection**: Configurable heuristics for anomaly detection
 - **Port Scan Detection**: Identification of scanning behavior patterns
 - **DoS/DDoS Indicators**: Burst traffic pattern recognition
@@ -78,6 +83,7 @@ Built with a distinctive Matrix-themed UI, it provides network administrators, s
 - **Real-time Alerts**: Configurable alert thresholds with notification feed
 
 ### 🤖 SOFIA AI Assistant (OpenRouter Integration)
+
 - **Natural Language Queries**: Ask questions about your network in plain language
 - **Multi-Language Support**: Turkish, English, German, French, Spanish, Japanese, Chinese
 - **AI Model Selection**: Choose from multiple LLM providers:
@@ -100,12 +106,14 @@ Built with a distinctive Matrix-themed UI, it provides network administrators, s
   - ⚠️ Incident Response
 
 ### 📈 QoS Metrics
+
 - **Latency Monitoring**: Real-time ping latency tracking
 - **Jitter Calculation**: Network stability measurement
 - **Packet Loss**: Loss percentage estimation
 - **Throughput**: Mbps-based speed calculation
 
 ### 🎨 User Interface
+
 - **Matrix-Themed Design**: Distinctive dark terminal aesthetic
 - **Tabbed Navigation**: Monitor / Scanner / Security / AI sections
 - **Live Terminal Output**: Real-time system event logging
@@ -137,6 +145,7 @@ Built with a distinctive Matrix-themed UI, it provides network administrators, s
 ```
 
 ### Technology Stack
+
 | Component | Technology |
 |-----------|------------|
 | Platform | Universal Windows Platform (UWP) |
@@ -182,6 +191,7 @@ App1/
 ## 🚀 Getting Started
 
 ### System Requirements
+
 - **Operating System**: Windows 10 (Build 17763) or Windows 11
 - **Development**: Visual Studio 2019/2022 with UWP workload
 - **Runtime**: .NET Native / .NET 5+
@@ -189,6 +199,7 @@ App1/
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/rootcastleco/-REI-network-analyzer.git
    cd -REI-network-analyzer
@@ -206,6 +217,7 @@ App1/
 ### Configuration
 
 #### OpenRouter API Key (Required for SOFIA AI)
+
 1. Visit [https://openrouter.ai](https://openrouter.ai)
 2. Create a free account
 3. Generate an API key
@@ -217,17 +229,20 @@ App1/
 ## 📖 Usage Guide
 
 ### Basic Monitoring
+
 1. Select a network interface from the dropdown
 2. Click **▶ START** to begin monitoring
 3. View real-time traffic in the topology and graph panels
 
 ### Network Scanning
+
 1. Navigate to **🔍 SCANNER** tab
 2. Enter target IP or range (e.g., `192.168.1.0/24`)
 3. Select scan type
 4. Click **🔍 SCAN** or **🌐 DISCOVER**
 
 ### AI Analysis
+
 1. Navigate to **🧠 SOFIA AI** tab
 2. Select preferred AI model and language
 3. Use quick action buttons or type a custom query
@@ -240,11 +255,13 @@ App1/
 This software is intended for **authorized network monitoring, security testing, and educational purposes only**.
 
 ### Disclaimer
+
 - Only scan networks you own or have explicit permission to test
 - Unauthorized network scanning may violate local laws
 - The developers are not responsible for misuse of this tool
 
 ### Recommended Use Cases
+
 - ✅ Monitoring your home/office network
 - ✅ Security auditing with proper authorization
 - ✅ Network troubleshooting and diagnostics
@@ -293,26 +310,49 @@ This software is intended for **authorized network monitoring, security testing,
 <td>
 
 ### Batuhan Ayrıbaş
+
 **Multidisciplinary Software & Systems Engineer**
 
 Founder and Lead Engineer at **Rootcastle Engineering & Innovation**
 
 With extensive hands-on experience in:
-- 🖥️ Full-stack application development
-- 🌐 IoT platforms and embedded systems
-- 📊 Data-driven architectures
-- 🔧 Applied engineering solutions
 
-Rootcastle blends practical engineering with long-term system thinking to transform complex ideas into reliable, production-ready products.
+- 🖥️ Full-stack application development
+- 🔐 Cybersecurity platforms & defense systems
+- 🌐 Secure IoT infrastructures
+- 📊 Data-driven architectures
+- �️ Mission-critical software solutions
 
 </td>
 </tr>
 </table>
 
+---
+
+## 🏢 About Rootcastle Engineering & Innovation
+
+**Rootcastle Engineering & Innovation** is a technology-driven engineering company focused on building **secure, mission-critical software systems**. The company develops:
+
+- 🔐 **Advanced Cybersecurity Platforms** — Threat detection, network monitoring, and security analysis tools
+- 🌐 **Secure IoT Infrastructures** — Hardened communication systems for connected devices
+- 🛡️ **Defense-Oriented Software Solutions** — Applications designed for high-reliability environments
+
+### Our Philosophy
+
+> *"Where resilience, integrity, and data protection are non-negotiable."*
+
+Under the leadership of **Batuhan Ayrıbaş**, Rootcastle combines deep software engineering expertise with cybersecurity and defense principles. The company designs and implements:
+
+- ✅ Secure architectures with zero-trust principles
+- ✅ Hardened communication systems
+- ✅ Defense-grade applications prioritizing threat prevention
+- ✅ Systems built for operational continuity and long-term trust
+
 ### Contact & Links
+
 - 🏢 **Organization**: [Rootcastle Engineering & Innovation](https://github.com/rootcastleco)
 - 📧 **Email**: Contact via GitHub
-- 🔗 **Repository**: [github.com/rootcastleco/-REI-network-analyzer](https://github.com/rootcastleco/-REI-network-analyzer)
+- 🔗 **Repository**: [github.com/rootcastleco/Rootcastle-Network-Monitor](https://github.com/rootcastleco/Rootcastle-Network-Monitor)
 
 ---
 

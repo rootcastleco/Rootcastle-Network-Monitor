@@ -552,13 +552,14 @@ Public NotInheritable Class MainPage
         Try
             Dim now = DateTime.Now
 
-            ' Simulate packet capture for testing
+            ' Simulate packet capture for testing (DEMO only - UWP limitation)
+            Dim rnd As New Random()
             Dim testPacket As New ConnectionInfo() With {
                 .Timestamp = now,
-                .SourceIP = "192.168.1." & _random.Next(1, 255),
-                .DestIP = "192.168.1." & _random.Next(1, 255),
-                .Protocol = If(_random.Next(0, 2) = 0, "TCP", "UDP"),
-                .Length = CLng(_random.Next(50, 1500)),
+                .SourceIP = "192.168.1." & rnd.Next(1, 255),
+                .DestIP = "192.168.1." & rnd.Next(1, 255),
+                .Protocol = If(rnd.Next(0, 2) = 0, "TCP", "UDP"),
+                .Length = CLng(rnd.Next(50, 1500)),
                 .Info = "Test packet " & _packetCount
             }
 
@@ -867,16 +868,6 @@ Public NotInheritable Class MainPage
             MonitorStatusText.Foreground = New SolidColorBrush(Windows.UI.ColorHelper.FromArgb(255, 0, 255, 0))
             StatusText.Text = "[MONITORING]"
         End If
-    End Sub
-
-    Private Sub SuspiciousPacketCheckBox_Checked(sender As Object, e As RoutedEventArgs)
-        _suspiciousDetectionEnabled = True
-        LogTerminal("[SEC] Suspicious detection enabled")
-    End Sub
-
-    Private Sub SuspiciousPacketCheckBox_Unchecked(sender As Object, e As RoutedEventArgs)
-        _suspiciousDetectionEnabled = False
-        LogTerminal("[SEC] Suspicious detection disabled")
     End Sub
 
     Private Sub ClearTerminalButton_Click(sender As Object, e As RoutedEventArgs)
@@ -1664,7 +1655,9 @@ Public NotInheritable Class MainPage
                            If(_selectedLanguage = "JP", "日本語",
                            If(_selectedLanguage = "CN", "中文", "Unknown")))))))
 
-            AIModelInfoText.Text = $"Selected: {_selectedAIModel} | Language: {langName}"
+            If AIModelInfoText IsNot Nothing Then
+                AIModelInfoText.Text = $"Selected: {_selectedAIModel} | Language: {langName}"
+            End If
         Catch ex As Exception
             System.Diagnostics.Debug.WriteLine($"[UI] AI model info update error: {ex.Message}")
         End Try
@@ -1905,6 +1898,8 @@ Please analyze the network data above and provide a detailed response to the use
             ' Retry loop with exponential backoff
             Dim attempt = 0
             Dim lastError As String = ""
+            Dim delayMs As Integer = 0
+            Dim shouldRetry As Boolean = False
 
             While attempt < MAX_RETRIES
                 attempt += 1
@@ -2022,24 +2017,34 @@ Too many requests sent to OpenRouter API. Please wait a few minutes and try agai
                         Exit While
 
                     End Using
+
+                    ' Reset delay for next iteration
+                    delayMs = 0
+
                 Catch ex As OperationCanceledException
                     LogStructured("WARN", "AI_TIMEOUT", _selectedAIModel, $"Timeout on attempt {attempt}", NetworkErrorType.Timeout, "")
                     lastError = "Request timed out"
 
                     If attempt < MAX_RETRIES Then
-                        ' Short backoff for timeout
-                        Await Task.Delay(CInt(1000 * attempt))
-                        Continue While
+                        delayMs = CInt(1000 * attempt)
+                        shouldRetry = True
                     End If
                 Catch ex As Exception
                     LogStructured("ERR", "AI_EXCEPTION", _selectedAIModel, $"Exception on attempt {attempt}: {ex.Message}", NetworkErrorType.Unknown, ex.ToString())
                     lastError = ex.Message
 
                     If attempt < MAX_RETRIES Then
-                        Await Task.Delay(CInt(1000 * attempt))
-                        Continue While
+                        delayMs = CInt(1000 * attempt)
+                        shouldRetry = True
                     End If
                 End Try
+
+                ' Delay outside catch block (VB.NET doesn't allow Await in Catch)
+                If delayMs > 0 AndAlso shouldRetry Then
+                    Await Task.Delay(delayMs)
+                    shouldRetry = False
+                    Continue While
+                End If
             End While
 
             ' All retries exhausted
@@ -2529,7 +2534,9 @@ Last error: {lastError}
                 description = "Cupp: Custom User Password Profiler. Generates wordlists based on target information."
         End Select
 
-        SecurityToolDescText.Text = description
+        If SecurityToolDescText IsNot Nothing Then
+            SecurityToolDescText.Text = description
+        End If
     End Sub
 
     ''' <summary>
@@ -2647,8 +2654,8 @@ Last error: {lastError}
                 sb.AppendLine($"Target: {result.Target}")
                 sb.AppendLine()
 
-                For Each err In result.Errors
-                    sb.AppendLine($"⚠️ {err.Code}: {err.Message}")
+                For Each scanErr In result.Errors
+                    sb.AppendLine($"⚠️ {scanErr.Code}: {scanErr.Message}")
                 Next
 
                 SecurityResultsText.Text = sb.ToString()

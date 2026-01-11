@@ -1,7 +1,11 @@
-﻿' Rootcastle Network Monitor v5.0
-' Powered by /REI
+﻿' Rootcastle Network Monitor v6.0
+' Powered by Rootcastle Engineering & Innovation
 ' Complete Network Surveillance: NMAP + Wireshark + Sniffnet + SOFIA AI
 ' Features: Port Scanning, Packet Analysis, Protocol Decode, Export, Traffic Analysis
+' Defense-Grade Quality Standards Applied
+
+Option Strict On
+Option Explicit On
 
 Imports System.Net.NetworkInformation
 Imports System.Net.Sockets
@@ -484,7 +488,9 @@ Public NotInheritable Class MainPage
             Canvas.SetLeft(bg, w / 2 - 60)
             Canvas.SetTop(bg, centerY - 12)
             TopologyCanvas.Children.Add(bg)
-        Catch
+        Catch ex As Exception
+            ' Non-critical UI rendering error - log but continue
+            System.Diagnostics.Debug.WriteLine($"[UI] Topology draw error: {ex.Message}")
         End Try
     End Sub
 
@@ -678,19 +684,57 @@ Public NotInheritable Class MainPage
                 TerminalScrollViewer?.ChangeView(Nothing, TerminalScrollViewer.ScrollableHeight, Nothing)
             End If
         Catch
-            ' Ignore logging errors
+            ' Logging failed - increment counter to track issues (cannot log this error to avoid recursion)
+            _errorCount += 1
         End Try
     End Sub
 #End Region
 
 #Region "QoS Metrics"
-    Private Sub UpdateQoSMetrics()
+    Private Async Sub UpdateQoSMetrics()
         Try
-            ' Simulate QoS metrics update
-            _latencyHistory.Add(_random.NextDouble() * 50)
-            If _latencyHistory.Count > 10 Then _latencyHistory.RemoveAt(0)
+            ' Use real ping to gateway or external target for actual latency measurement
+            Dim target = "8.8.8.8"  ' Google DNS as reliable target
 
-            Dim avgLatency = _latencyHistory.Average()
+            ' Get gateway if available
+            If _selectedInterface IsNot Nothing Then
+                Try
+                    Dim ipProps = _selectedInterface.GetIPProperties()
+                    Dim gateway = ipProps.GatewayAddresses.FirstOrDefault()
+                    If gateway IsNot Nothing AndAlso gateway.Address IsNot Nothing Then
+                        target = gateway.Address.ToString()
+                    End If
+                Catch
+                    ' Fallback to 8.8.8.8
+                End Try
+            End If
+
+            ' Perform actual ping for real latency
+            Using ping As New Ping()
+                Try
+                    Dim reply = Await ping.SendPingAsync(target, 500)
+                    If reply.Status = IPStatus.Success Then
+                        _latencyHistory.Add(CDbl(reply.RoundtripTime))
+                        ' Track successful pings for packet loss calculation
+                        _packetLoss = 0
+                    Else
+                        ' Ping failed - record as high latency and increment loss
+                        _latencyHistory.Add(500.0)  ' Timeout value
+                        _packetLoss = Math.Min(100, _packetLoss + 10)  ' Increment loss %
+                    End If
+                Catch
+                    ' Ping exception - treat as packet loss
+                    _latencyHistory.Add(500.0)
+                    _packetLoss = Math.Min(100, _packetLoss + 10)
+                End Try
+            End Using
+
+            ' Keep history bounded
+            If _latencyHistory.Count > 20 Then _latencyHistory.RemoveAt(0)
+
+            ' Calculate average latency (excluding timeouts for accuracy)
+            Dim validLatencies = _latencyHistory.Where(Function(l) l < 500).ToList()
+            Dim avgLatency = If(validLatencies.Count > 0, validLatencies.Average(), 0)
             _currentLatency = avgLatency
 
             ' Left panel
@@ -699,22 +743,21 @@ Public NotInheritable Class MainPage
             ' QoS panel
             QosLatencyText.Text = $"{avgLatency:F1} ms"
 
-            ' Jitter
-            If _latencyHistory.Count > 1 Then
+            ' Jitter calculation (variation between consecutive measurements)
+            If validLatencies.Count > 1 Then
                 Dim jitter = 0.0
-                For i = 1 To _latencyHistory.Count - 1
-                    jitter += Math.Abs(_latencyHistory(i) - _latencyHistory(i - 1))
+                For i = 1 To validLatencies.Count - 1
+                    jitter += Math.Abs(validLatencies(i) - validLatencies(i - 1))
                 Next
-                jitter /= (_latencyHistory.Count - 1)
+                jitter /= (validLatencies.Count - 1)
                 _jitter = jitter
             End If
             QosJitterText.Text = $"{_jitter:F1} ms"
 
-            ' Packet Loss (simulate 0.1% packet loss)
-            _packetLoss = If(_random.NextDouble() < 0.001, 1, 0)
-            QosLossText.Text = $"{_packetLoss}%"
+            ' Packet Loss display
+            QosLossText.Text = $"{_packetLoss:F1}%"
 
-            ' Throughput (rough estimate)
+            ' Throughput (calculated from actual traffic)
             _throughput = (_bytesPerSecIn + _bytesPerSecOut) * 8.0 / 1_000_000.0
             QosThroughputText.Text = $"{_throughput:F2} Mbps"
         Catch ex As Exception
@@ -732,8 +775,10 @@ Public NotInheritable Class MainPage
             Dim usedBps = (_bytesPerSecIn + _bytesPerSecOut) * 8.0
             Dim pct = Math.Min(100.0, (usedBps / _selectedInterface.Speed) * 100.0)
             BandwidthText.Text = $"{pct:F1}%"
-        Catch
+        Catch ex As Exception
+            ' Fallback value - bandwidth calculation failed
             BandwidthText.Text = "0%"
+            System.Diagnostics.Debug.WriteLine($"[UI] Bandwidth calc error: {ex.Message}")
         End Try
     End Sub
 
@@ -1185,6 +1230,134 @@ Public NotInheritable Class MainPage
         End Try
     End Sub
 
+    ''' <summary>
+    ''' HTTP/HTTPS health check with timeout and TLS validation.
+    ''' </summary>
+    Private Async Sub HttpCheckButton_Click(sender As Object, e As RoutedEventArgs)
+        Dim target = SanitizeInput(TargetHostTextBox.Text)
+        If String.IsNullOrEmpty(target) Then
+            ShowAlert("Enter target URL or hostname")
+            Return
+        End If
+
+        ' Build URL if not provided
+        Dim url As String
+        If target.StartsWith("http://") OrElse target.StartsWith("https://") Then
+            url = target
+        Else
+            url = $"https://{target}"
+        End If
+
+        LogTerminal($"[HTTP] Checking health: {url}")
+
+        Dim sw As New System.Diagnostics.Stopwatch()
+        sw.Start()
+
+        Try
+            Using client As New HttpClient()
+                ' Set timeout
+                Dim cts As New CancellationTokenSource(TimeSpan.FromSeconds(10))
+
+                ' Make request
+                Dim request As New HttpRequestMessage(HttpMethod.Get, New Uri(url))
+                request.Headers.Add("User-Agent", "Rootcastle-Network-Monitor/6.0")
+
+                Dim response = Await client.SendRequestAsync(request).AsTask(cts.Token)
+                sw.Stop()
+
+                Dim statusCode = CInt(response.StatusCode)
+                Dim statusText = response.StatusCode.ToString()
+
+                If response.IsSuccessStatusCode Then
+                    LogTerminal($"[HTTP] ✅ {url} - Status: {statusCode} {statusText} ({sw.ElapsedMilliseconds}ms)")
+                    ShowAlert($"HTTP OK: {statusCode}")
+                ElseIf statusCode >= 400 AndAlso statusCode < 500 Then
+                    LogTerminal($"[HTTP] ⚠️ {url} - Client Error: {statusCode} {statusText} ({sw.ElapsedMilliseconds}ms)")
+                    ShowAlert($"HTTP Client Error: {statusCode}")
+                ElseIf statusCode >= 500 Then
+                    LogTerminal($"[HTTP] ❌ {url} - Server Error: {statusCode} {statusText} ({sw.ElapsedMilliseconds}ms)")
+                    ShowAlert($"HTTP Server Error: {statusCode}")
+                Else
+                    LogTerminal($"[HTTP] {url} - Status: {statusCode} {statusText} ({sw.ElapsedMilliseconds}ms)")
+                End If
+            End Using
+        Catch ex As OperationCanceledException
+            sw.Stop()
+            LogTerminal($"[HTTP] ❌ {url} - Timeout after {sw.ElapsedMilliseconds}ms")
+            ShowAlert("HTTP request timed out")
+        Catch ex As Exception
+            sw.Stop()
+            Dim errorType = "Unknown"
+            If ex.Message.Contains("SSL") OrElse ex.Message.Contains("TLS") OrElse ex.Message.Contains("certificate") Then
+                errorType = "TLS/Certificate"
+            ElseIf ex.Message.Contains("host") OrElse ex.Message.Contains("DNS") Then
+                errorType = "DNS"
+            ElseIf ex.Message.Contains("refused") Then
+                errorType = "Connection Refused"
+            End If
+            LogTerminal($"[HTTP] ❌ {url} - {errorType} Error: {ex.Message}")
+            ShowAlert($"HTTP {errorType} Error")
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' DNS resolution check to verify hostname resolution.
+    ''' </summary>
+    Private Async Sub DnsCheckButton_Click(sender As Object, e As RoutedEventArgs)
+        Dim target = SanitizeInput(TargetHostTextBox.Text)
+        If String.IsNullOrEmpty(target) Then
+            ShowAlert("Enter hostname to resolve")
+            Return
+        End If
+
+        ' Remove protocol prefix if present
+        If target.StartsWith("http://") Then target = target.Substring(7)
+        If target.StartsWith("https://") Then target = target.Substring(8)
+        If target.Contains("/") Then target = target.Split("/"c)(0)
+
+        If Not IsValidHostOrIP(target) Then
+            ShowAlert("Invalid hostname format")
+            Return
+        End If
+
+        LogTerminal($"[DNS] Resolving: {target}")
+
+        Dim sw As New System.Diagnostics.Stopwatch()
+        sw.Start()
+
+        Try
+            Dim hostEntry = Await Dns.GetHostEntryAsync(target)
+            sw.Stop()
+
+            _dnsQueryCount += 1
+
+            If hostEntry.AddressList.Length > 0 Then
+                LogTerminal($"[DNS] ✅ {target} resolved in {sw.ElapsedMilliseconds}ms:")
+                For Each addr In hostEntry.AddressList
+                    LogTerminal($"[DNS]   → {addr} ({addr.AddressFamily})")
+                Next
+                ShowAlert($"DNS OK: {hostEntry.AddressList.Length} address(es)")
+            Else
+                LogTerminal($"[DNS] ⚠️ {target} resolved but no addresses returned")
+                ShowAlert("DNS: No addresses")
+            End If
+        Catch ex As System.Net.Sockets.SocketException
+            sw.Stop()
+            _dnsNxdomainCount += 1
+            If ex.SocketErrorCode = System.Net.Sockets.SocketError.HostNotFound Then
+                LogTerminal($"[DNS] ❌ {target} - NXDOMAIN (host not found)")
+                ShowAlert("DNS: Host not found")
+            Else
+                LogTerminal($"[DNS] ❌ {target} - Error: {ex.SocketErrorCode}")
+                ShowAlert($"DNS Error: {ex.SocketErrorCode}")
+            End If
+        Catch ex As Exception
+            sw.Stop()
+            LogTerminal($"[DNS] ❌ {target} - Error: {ex.Message}")
+            ShowAlert("DNS resolution failed")
+        End Try
+    End Sub
+
 #End Region
 
 #Region "Input Validation"
@@ -1447,7 +1620,8 @@ Public NotInheritable Class MainPage
                            If(_selectedLanguage = "CN", "中文", "Unknown")))))))
 
             AIModelInfoText.Text = $"Selected: {_selectedAIModel} | Language: {langName}"
-        Catch
+        Catch ex As Exception
+            System.Diagnostics.Debug.WriteLine($"[UI] AI model info update error: {ex.Message}")
         End Try
     End Sub
 
@@ -1741,6 +1915,13 @@ Your API key is invalid or expired.
             Return
         End If
 
+        ' CRITICAL: Require explicit permission confirmation before scanning
+        If Not ScanPermissionCheckBox.IsChecked.GetValueOrDefault(False) Then
+            LogTerminal("[NMAP] Authorization required - checkbox not checked")
+            ShowAlert("⚠️ Please confirm you have authorization to scan these targets")
+            Return
+        End If
+
         Dim target = NmapTargetTextBox.Text.Trim()
         If String.IsNullOrEmpty(target) Then
             LogTerminal("[NMAP] Target required")
@@ -1798,6 +1979,13 @@ Your API key is invalid or expired.
     Private Async Sub NmapNetworkDiscoveryButton_Click(sender As Object, e As RoutedEventArgs)
         If _isNmapScanning Then
             LogTerminal("[NMAP] Scan already in progress")
+            Return
+        End If
+
+        ' CRITICAL: Require explicit permission confirmation before scanning
+        If Not ScanPermissionCheckBox.IsChecked.GetValueOrDefault(False) Then
+            LogTerminal("[NMAP] Authorization required - checkbox not checked")
+            ShowAlert("⚠️ Please confirm you have authorization to scan these targets")
             Return
         End If
 

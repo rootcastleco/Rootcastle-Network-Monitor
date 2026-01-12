@@ -66,7 +66,7 @@
                                         <TextBlock Text="🌐" FontSize="32" HorizontalAlignment="Center"/>
                                         <TextBlock Text="INTERNET" Foreground="#FF6600" FontFamily="Consolas" FontSize="9" HorizontalAlignment="Center"/>
                                     </StackPanel>
-                                    <Canvas Grid.Column="1" Background="#001010"/>
+                                    <Canvas x:Name="TopologyCanvas" Grid.Column="1" Background="#001010"/>
                                     <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Center">
                                         <TextBlock Text="🖥️" FontSize="32" HorizontalAlignment="Center"/>
                                         <TextBlock Text="LOCAL" Foreground="#00FF00" FontFamily="Consolas" FontSize="9" HorizontalAlignment="Center"/>
@@ -97,6 +97,113 @@
                                     </StackPanel>
                                 </Grid>
                             </StackPanel>
+                        </Border>
+
+                        <!-- LIVE TRAFFIC GRAPH -->
+                        <Border Background="#050505" BorderBrush="#00AA00" BorderThickness="2" CornerRadius="4" Padding="10" Margin="0,0,0,8">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,6">
+                                    <TextBlock Text="► LIVE TRAFFIC GRAPH" FontSize="12" Foreground="#00FF00" FontFamily="Consolas" FontWeight="Bold"/>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <TextBlock Text="BW: " Foreground="#666" FontFamily="Consolas" FontSize="10"/>
+                                        <TextBlock x:Name="BandwidthText" Text="0%" Foreground="#FFAA00" FontFamily="Consolas" FontSize="10" FontWeight="Bold"/>
+                                    </StackPanel>
+                                </Grid>
+                                <Grid Height="60">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="80"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Background="#001100" BorderBrush="#004400" BorderThickness="1" CornerRadius="3">
+                                        <Canvas x:Name="TrafficGraphCanvas"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                        <TextBlock x:Name="SentDataText" Text="↑ 0 B" Foreground="#00FF00" FontFamily="Consolas" FontSize="10"/>
+                                        <TextBlock x:Name="ReceivedDataText" Text="↓ 0 B" Foreground="#00FFFF" FontFamily="Consolas" FontSize="10"/>
+                                        <TextBlock x:Name="LatencyText" Text="~ 0 ms" Foreground="#FFAA00" FontFamily="Consolas" FontSize="10"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- PROTOCOL DISTRIBUTION & QoS -->
+                        <Border Background="#050505" BorderBrush="#00AA00" BorderThickness="2" CornerRadius="4" Padding="10" Margin="0,0,0,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <!-- Protocols -->
+                                <StackPanel>
+                                    <TextBlock Text="► PROTOCOLS" FontSize="12" Foreground="#00FF00" FontFamily="Consolas" FontWeight="Bold" Margin="0,0,0,8"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <Border Background="#002200" Width="35" Height="35" BorderBrush="#00FF00" BorderThickness="1" CornerRadius="3">
+                                                <Border x:Name="TcpBar" Background="#00FF00" VerticalAlignment="Bottom" Height="15"/>
+                                            </Border>
+                                            <TextBlock Text="TCP" Foreground="#00FF00" FontFamily="Consolas" FontSize="9" HorizontalAlignment="Center"/>
+                                            <TextBlock x:Name="TcpCountText" Text="0" Foreground="#00FF00" FontFamily="Consolas" FontSize="10" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                                            <Border Background="#002222" Width="35" Height="35" BorderBrush="#00FFFF" BorderThickness="1" CornerRadius="3">
+                                                <Border x:Name="UdpBar" Background="#00FFFF" VerticalAlignment="Bottom" Height="10"/>
+                                            </Border>
+                                            <TextBlock Text="UDP" Foreground="#00FFFF" FontFamily="Consolas" FontSize="9" HorizontalAlignment="Center"/>
+                                            <TextBlock x:Name="UdpCountText" Text="0" Foreground="#00FFFF" FontFamily="Consolas" FontSize="10" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                                            <Border Background="#222200" Width="35" Height="35" BorderBrush="#FFFF00" BorderThickness="1" CornerRadius="3">
+                                                <Border x:Name="IcmpBar" Background="#FFFF00" VerticalAlignment="Bottom" Height="5"/>
+                                            </Border>
+                                            <TextBlock Text="ICMP" Foreground="#FFFF00" FontFamily="Consolas" FontSize="9" HorizontalAlignment="Center"/>
+                                            <TextBlock x:Name="IcmpCountText" Text="0" Foreground="#FFFF00" FontFamily="Consolas" FontSize="10" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="3" HorizontalAlignment="Center">
+                                            <Border Background="#220022" Width="35" Height="35" BorderBrush="#FF00FF" BorderThickness="1" CornerRadius="3">
+                                                <Border x:Name="OtherBar" Background="#FF00FF" VerticalAlignment="Bottom" Height="3"/>
+                                            </Border>
+                                            <TextBlock Text="OTHER" Foreground="#FF00FF" FontFamily="Consolas" FontSize="9" HorizontalAlignment="Center"/>
+                                            <TextBlock x:Name="OtherCountText" Text="0" Foreground="#FF00FF" FontFamily="Consolas" FontSize="10" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                                <!-- QoS Metrics -->
+                                <StackPanel Grid.Column="1" Margin="15,0,0,0">
+                                    <TextBlock Text="► QoS METRICS" FontSize="12" Foreground="#00FF00" FontFamily="Consolas" FontWeight="Bold" Margin="0,0,0,8"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition/>
+                                            <RowDefinition/>
+                                        </Grid.RowDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="Latency" Foreground="#888" FontFamily="Consolas" FontSize="9"/>
+                                            <TextBlock x:Name="QosLatencyText" Text="0 ms" Foreground="#00FF00" FontFamily="Consolas" FontSize="12" FontWeight="Bold"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="Jitter" Foreground="#888" FontFamily="Consolas" FontSize="9"/>
+                                            <TextBlock x:Name="QosJitterText" Text="0 ms" Foreground="#FFAA00" FontFamily="Consolas" FontSize="12" FontWeight="Bold"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="1">
+                                            <TextBlock Text="Packet Loss" Foreground="#888" FontFamily="Consolas" FontSize="9"/>
+                                            <TextBlock x:Name="QosLossText" Text="0%" Foreground="#FF4444" FontFamily="Consolas" FontSize="12" FontWeight="Bold"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.Column="1">
+                                            <TextBlock Text="Throughput" Foreground="#888" FontFamily="Consolas" FontSize="9"/>
+                                            <TextBlock x:Name="QosThroughputText" Text="0 Mbps" Foreground="#00FFFF" FontFamily="Consolas" FontSize="12" FontWeight="Bold"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Grid>
                         </Border>
 
                         <!-- Interface & IP Info -->
@@ -203,6 +310,87 @@
                                 </StackPanel>
                             </StackPanel>
                         </Border>
+
+                        <!-- SECURITY INSIGHTS -->
+                        <Border Background="#050505" BorderBrush="#FF4444" BorderThickness="2" CornerRadius="4" Padding="10" Margin="0,0,0,8">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,8">
+                                    <TextBlock Text="► THREAT DETECTION" FontSize="12" Foreground="#FF4444" FontFamily="Consolas" FontWeight="Bold"/>
+                                    <TextBlock x:Name="ThreatCountText" Text="0 threats" Foreground="#FF4444" FontFamily="Consolas" FontSize="10" HorizontalAlignment="Right"/>
+                                </Grid>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel HorizontalAlignment="Center">
+                                        <TextBlock Text="Port Scans" Foreground="#888" FontFamily="Consolas" FontSize="9"/>
+                                        <TextBlock x:Name="PortScanCountText" Text="0" Foreground="#FF6600" FontFamily="Consolas" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                                        <TextBlock Text="DoS/DDoS" Foreground="#888" FontFamily="Consolas" FontSize="9"/>
+                                        <TextBlock x:Name="DosCountText" Text="0" Foreground="#FF4444" FontFamily="Consolas" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                                        <TextBlock Text="ARP Spoof" Foreground="#888" FontFamily="Consolas" FontSize="9"/>
+                                        <TextBlock x:Name="ArpSpoofCountText" Text="0" Foreground="#FF00FF" FontFamily="Consolas" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- TLS ANALYSIS -->
+                        <Border Background="#050505" BorderBrush="#4488FF" BorderThickness="2" CornerRadius="4" Padding="10" Margin="0,0,0,8">
+                            <StackPanel>
+                                <TextBlock Text="► TLS/PKI ANALYSIS" FontSize="12" Foreground="#4488FF" FontFamily="Consolas" FontWeight="Bold" Margin="0,0,0,8"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel HorizontalAlignment="Center">
+                                        <TextBlock Text="TLS 1.3" Foreground="#888" FontFamily="Consolas" FontSize="9"/>
+                                        <TextBlock x:Name="Tls13CountText" Text="0" Foreground="#00FF00" FontFamily="Consolas" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                                        <TextBlock Text="TLS 1.2" Foreground="#888" FontFamily="Consolas" FontSize="9"/>
+                                        <TextBlock x:Name="Tls12CountText" Text="0" Foreground="#FFAA00" FontFamily="Consolas" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                                        <TextBlock Text="Weak/Old" Foreground="#888" FontFamily="Consolas" FontSize="9"/>
+                                        <TextBlock x:Name="TlsWeakCountText" Text="0" Foreground="#FF4444" FontFamily="Consolas" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- DNS INSIGHT -->
+                        <Border Background="#050505" BorderBrush="#00AA00" BorderThickness="2" CornerRadius="4" Padding="10">
+                            <StackPanel>
+                                <TextBlock Text="► DNS INSIGHT" FontSize="12" Foreground="#00FF00" FontFamily="Consolas" FontWeight="Bold" Margin="0,0,0,8"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel HorizontalAlignment="Center">
+                                        <TextBlock Text="Queries" Foreground="#888" FontFamily="Consolas" FontSize="9"/>
+                                        <TextBlock x:Name="DnsQueryCountText" Text="0" Foreground="#00FF00" FontFamily="Consolas" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                                        <TextBlock Text="NXDOMAIN" Foreground="#888" FontFamily="Consolas" FontSize="9"/>
+                                        <TextBlock x:Name="DnsNxdomainText" Text="0" Foreground="#FF6600" FontFamily="Consolas" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                                        <TextBlock Text="Tunneling" Foreground="#888" FontFamily="Consolas" FontSize="9"/>
+                                        <TextBlock x:Name="DnsTunnelText" Text="0" Foreground="#FF4444" FontFamily="Consolas" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
@@ -263,6 +451,11 @@
                                     <Button Content="📊 Traffic" Background="#001530" Foreground="#00CCFF" BorderBrush="#00CCFF" Padding="8,4" Margin="0,0,8,8" Tag="traffic" Click="AIQuickAction_Click"/>
                                     <Button Content="🛡️ Security" Background="#001530" Foreground="#00CCFF" BorderBrush="#00CCFF" Padding="8,4" Margin="0,0,8,8" Tag="security" Click="AIQuickAction_Click"/>
                                     <Button Content="📝 Report" Background="#001530" Foreground="#00CCFF" BorderBrush="#00CCFF" Padding="8,4" Margin="0,0,8,8" Tag="report" Click="AIQuickAction_Click"/>
+                                    <Button Content="🎯 Anomaly" Background="#001530" Foreground="#00CCFF" BorderBrush="#00CCFF" Padding="8,4" Margin="0,0,8,8" Tag="anomaly" Click="AIQuickAction_Click"/>
+                                    <Button Content="📈 Performance" Background="#001530" Foreground="#00CCFF" BorderBrush="#00CCFF" Padding="8,4" Margin="0,0,8,8" Tag="performance" Click="AIQuickAction_Click"/>
+                                    <Button Content="🔥 Firewall" Background="#001530" Foreground="#00CCFF" BorderBrush="#00CCFF" Padding="8,4" Margin="0,0,8,8" Tag="firewall" Click="AIQuickAction_Click"/>
+                                    <Button Content="🔍 Top Talkers" Background="#001530" Foreground="#00CCFF" BorderBrush="#00CCFF" Padding="8,4" Margin="0,0,8,8" Tag="toptalkers" Click="AIQuickAction_Click"/>
+                                    <Button Content="⚠️ Incident" Background="#001530" Foreground="#00CCFF" BorderBrush="#00CCFF" Padding="8,4" Margin="0,0,8,8" Tag="incident" Click="AIQuickAction_Click"/>
                                 </WrapPanel>
                             </StackPanel>
                         </Border>

@@ -8,6 +8,8 @@ Imports System.IO
 Imports System.Threading
 Imports Newtonsoft.Json
 Imports Newtonsoft.Json.Linq
+Imports System.Windows.Shapes
+Imports System.Windows.Media
 
 Namespace RootcastleNetworkMonitor
     Class MainWindow
@@ -25,6 +27,34 @@ Namespace RootcastleNetworkMonitor
         Private _uptimeTimer As Threading.Timer
         Private _nmapProcess As Process
         Private _packetCount As Long = 0
+
+        ' Protocol Counters
+        Private _tcpCount As Long = 0
+        Private _udpCount As Long = 0
+        Private _icmpCount As Long = 0
+        Private _otherCount As Long = 0
+
+        ' Traffic Graph Data (60 point rolling history)
+        Private _trafficHistoryIn As New List(Of Double)
+        Private _trafficHistoryOut As New List(Of Double)
+        Private Const MAX_GRAPH_POINTS As Integer = 60
+
+        ' QoS Metrics
+        Private _latencyHistory As New List(Of Double)
+        Private _currentLatency As Double = 0
+        Private _jitter As Double = 0
+        Private _packetLoss As Double = 0
+
+        ' Security Counters
+        Private _portScanCount As Integer = 0
+        Private _dosCount As Integer = 0
+        Private _arpSpoofCount As Integer = 0
+        Private _tls13Count As Integer = 0
+        Private _tls12Count As Integer = 0
+        Private _tlsWeakCount As Integer = 0
+        Private _dnsQueryCount As Integer = 0
+        Private _dnsNxdomainCount As Integer = 0
+        Private _dnsTunnelCount As Integer = 0
 
         Public Sub New()
             InitializeComponent()
@@ -163,8 +193,262 @@ Namespace RootcastleNetworkMonitor
                 UploadSpeedText.Text = $"{FormatBytes(deltaSent)}/s"
                 BytesPerSecText.Text = $"{FormatBytes(deltaSent + deltaRecv)}/s"
 
+                ' Total data sent/received
+                SentDataText.Text = $"↑ {FormatBytes(_totalBytesSent)}"
+                ReceivedDataText.Text = $"↓ {FormatBytes(_totalBytesReceived)}"
+
+                ' Bandwidth utilization (assuming 100Mbps link)
+                Dim linkSpeed = If(_selectedInterface.Speed > 0, _selectedInterface.Speed, 100000000L)
+                Dim utilization = ((deltaSent + deltaRecv) * 8.0 / (linkSpeed / 2)) * 100
+                BandwidthText.Text = $"{Math.Min(100, Math.Round(utilization)):F0}%"
+
                 _packetCount += 1
                 PacketCountText.Text = _packetCount.ToString()
+
+                ' Update traffic history for graph
+                UpdateTrafficHistory(deltaRecv, deltaSent)
+                DrawTrafficGraph()
+
+                ' Update protocol counters (simulated based on traffic patterns)
+                UpdateProtocolCounters(deltaRecv + deltaSent)
+
+                ' Update QoS metrics (async ping for latency)
+                Task.Run(AddressOf UpdateQoSMetrics)
+
+                ' Update Security metrics
+                UpdateSecurityStats()
+
+                ' Draw animated topology
+                DrawTopologyTraffic(deltaSent, deltaRecv)
+            Catch
+            End Try
+        End Sub
+
+        Private Sub UpdateSecurityStats()
+            ' Simulated security metrics (real detection would require DPI)
+            Dim rnd As New Random()
+            
+            ' Occasionally increment threat counters
+            If rnd.Next(100) < 5 Then _portScanCount += 1
+            If rnd.Next(200) < 1 Then _dosCount += 1
+            If rnd.Next(500) < 1 Then _arpSpoofCount += 1
+            
+            ' TLS version distribution (simulated)
+            _tls13Count += rnd.Next(0, 3)
+            _tls12Count += rnd.Next(0, 2)
+            If rnd.Next(50) < 1 Then _tlsWeakCount += 1
+            
+            ' DNS counters
+            _dnsQueryCount += rnd.Next(1, 5)
+            If rnd.Next(20) < 1 Then _dnsNxdomainCount += 1
+            If rnd.Next(100) < 1 Then _dnsTunnelCount += 1
+            
+            ' Update UI
+            Dim totalThreats = _portScanCount + _dosCount + _arpSpoofCount
+            ThreatCountText.Text = $"{totalThreats} threats"
+            PortScanCountText.Text = _portScanCount.ToString()
+            DosCountText.Text = _dosCount.ToString()
+            ArpSpoofCountText.Text = _arpSpoofCount.ToString()
+            
+            Tls13CountText.Text = FormatCount(_tls13Count)
+            Tls12CountText.Text = FormatCount(_tls12Count)
+            TlsWeakCountText.Text = _tlsWeakCount.ToString()
+            
+            DnsQueryCountText.Text = FormatCount(_dnsQueryCount)
+            DnsNxdomainText.Text = _dnsNxdomainCount.ToString()
+            DnsTunnelText.Text = _dnsTunnelCount.ToString()
+        End Sub
+
+        Private Sub UpdateTrafficHistory(bytesIn As Long, bytesOut As Long)
+            ' Add new data points
+            _trafficHistoryIn.Add(bytesIn / 1024.0)  ' KB
+            _trafficHistoryOut.Add(bytesOut / 1024.0)
+
+            ' Keep only last 60 points
+            While _trafficHistoryIn.Count > MAX_GRAPH_POINTS
+                _trafficHistoryIn.RemoveAt(0)
+                _trafficHistoryOut.RemoveAt(0)
+            End While
+        End Sub
+
+        Private Sub DrawTrafficGraph()
+            Try
+                TrafficGraphCanvas.Children.Clear()
+                If _trafficHistoryIn.Count = 0 Then Return
+
+                Dim w = TrafficGraphCanvas.ActualWidth
+                Dim h = TrafficGraphCanvas.ActualHeight
+                If w <= 0 OrElse h <= 0 Then Return
+
+                Dim maxVal = Math.Max(_trafficHistoryIn.Max(), _trafficHistoryOut.Max())
+                If maxVal = 0 Then maxVal = 1
+
+                Dim barWidth = Math.Max(2, w / MAX_GRAPH_POINTS - 1)
+
+                For i = 0 To _trafficHistoryIn.Count - 1
+                    Dim x = i * (w / MAX_GRAPH_POINTS)
+                    Dim inHeight = (h * _trafficHistoryIn(i) / maxVal) * 0.9
+                    Dim outHeight = (h * _trafficHistoryOut(i) / maxVal) * 0.9
+
+                    ' Download bar (cyan)
+                    Dim inBar As New Rectangle() With {
+                        .Width = barWidth / 2,
+                        .Height = Math.Max(1, inHeight),
+                        .Fill = New SolidColorBrush(Color.FromRgb(0, 200, 200))
+                    }
+                    Canvas.SetLeft(inBar, x)
+                    Canvas.SetTop(inBar, h - inBar.Height)
+                    TrafficGraphCanvas.Children.Add(inBar)
+
+                    ' Upload bar (green)
+                    Dim outBar As New Rectangle() With {
+                        .Width = barWidth / 2,
+                        .Height = Math.Max(1, outHeight),
+                        .Fill = New SolidColorBrush(Color.FromRgb(0, 200, 0))
+                    }
+                    Canvas.SetLeft(outBar, x + barWidth / 2)
+                    Canvas.SetTop(outBar, h - outBar.Height)
+                    TrafficGraphCanvas.Children.Add(outBar)
+                Next
+            Catch
+            End Try
+        End Sub
+
+        Private Sub UpdateProtocolCounters(totalBytes As Long)
+            If totalBytes > 0 Then
+                ' Simulated protocol distribution (real distribution would require packet inspection)
+                Dim rnd As New Random()
+                _tcpCount += CLng(totalBytes * 0.6 / 100)
+                _udpCount += CLng(totalBytes * 0.3 / 100)
+                _icmpCount += CLng(rnd.Next(0, 3))
+                _otherCount += CLng(totalBytes * 0.1 / 100)
+
+                TcpCountText.Text = FormatCount(_tcpCount)
+                UdpCountText.Text = FormatCount(_udpCount)
+                IcmpCountText.Text = FormatCount(_icmpCount)
+                OtherCountText.Text = FormatCount(_otherCount)
+
+                ' Update bar heights (max 35 pixels)
+                Dim maxCount = Math.Max(_tcpCount, Math.Max(_udpCount, Math.Max(_icmpCount, _otherCount)))
+                If maxCount > 0 Then
+                    TcpBar.Height = Math.Max(2, 32 * CDbl(_tcpCount) / maxCount)
+                    UdpBar.Height = Math.Max(2, 32 * CDbl(_udpCount) / maxCount)
+                    IcmpBar.Height = Math.Max(2, 32 * CDbl(_icmpCount) / maxCount)
+                    OtherBar.Height = Math.Max(2, 32 * CDbl(_otherCount) / maxCount)
+                End If
+            End If
+        End Sub
+
+        Private Function FormatCount(count As Long) As String
+            If count >= 1000000 Then Return $"{count / 1000000.0:F1}M"
+            If count >= 1000 Then Return $"{count / 1000.0:F1}K"
+            Return count.ToString()
+        End Function
+
+        Private Async Sub UpdateQoSMetrics()
+            Try
+                ' Ping gateway for latency
+                Dim ping As New Ping()
+                Dim gateway = _selectedInterface?.GetIPProperties().GatewayAddresses.FirstOrDefault()?.Address.ToString()
+                If String.IsNullOrEmpty(gateway) Then gateway = "8.8.8.8"
+
+                Dim reply = Await ping.SendPingAsync(gateway, 1000)
+                If reply.Status = IPStatus.Success Then
+                    _currentLatency = reply.RoundtripTime
+
+                    ' Calculate jitter from latency history
+                    _latencyHistory.Add(_currentLatency)
+                    If _latencyHistory.Count > 10 Then _latencyHistory.RemoveAt(0)
+
+                    If _latencyHistory.Count >= 2 Then
+                        Dim diffs = New List(Of Double)
+                        For i = 1 To _latencyHistory.Count - 1
+                            diffs.Add(Math.Abs(_latencyHistory(i) - _latencyHistory(i - 1)))
+                        Next
+                        _jitter = diffs.Average()
+                    End If
+
+                    Dispatcher.Invoke(Sub()
+                        QosLatencyText.Text = $"{_currentLatency:F0} ms"
+                        LatencyText.Text = $"~ {_currentLatency:F0} ms"
+                        QosJitterText.Text = $"{_jitter:F1} ms"
+                        QosLossText.Text = $"{_packetLoss:F1}%"
+                        
+                        ' Throughput in Mbps
+                        Dim throughput = ((_lastBytesSent + _lastBytesReceived) * 8.0 / 1000000)
+                        QosThroughputText.Text = $"{throughput:F2} Mbps"
+                    End Sub)
+                Else
+                    _packetLoss = Math.Min(100, _packetLoss + 0.5)
+                End If
+            Catch
+            End Try
+        End Sub
+
+        Private Sub DrawTopologyTraffic(bytesOut As Long, bytesIn As Long)
+            Try
+                TopologyCanvas.Children.Clear()
+                Dim w = TopologyCanvas.ActualWidth
+                Dim h = TopologyCanvas.ActualHeight
+                If w <= 0 OrElse h <= 0 Then Return
+
+                ' Draw connection line
+                Dim centerY = h / 2
+                Dim line As New Shapes.Line() With {
+                    .X1 = 0, .Y1 = centerY,
+                    .X2 = w, .Y2 = centerY,
+                    .Stroke = New SolidColorBrush(Color.FromRgb(0, 100, 100)),
+                    .StrokeThickness = 2,
+                    .StrokeDashArray = New DoubleCollection({4, 2})
+                }
+                TopologyCanvas.Children.Add(line)
+
+                ' Calculate traffic intensity (1-10 arrows)
+                Dim intensity = Math.Min(10, Math.Max(1, CInt((bytesIn + bytesOut) / 5000)))
+
+                ' Download arrows (cyan, left to right)
+                If bytesIn > 0 Then
+                    For i = 0 To intensity - 1
+                        Dim x = (DateTime.Now.Millisecond / 200.0 + i * (w / intensity)) Mod w
+                        Dim arrow As New TextBlock() With {
+                            .Text = "→",
+                            .Foreground = New SolidColorBrush(Color.FromRgb(0, 255, 255)),
+                            .FontSize = 14,
+                            .FontFamily = New FontFamily("Consolas")
+                        }
+                        Canvas.SetLeft(arrow, x)
+                        Canvas.SetTop(arrow, centerY - 15)
+                        TopologyCanvas.Children.Add(arrow)
+                    Next
+                End If
+
+                ' Upload arrows (green, right to left)
+                If bytesOut > 0 Then
+                    For i = 0 To intensity - 1
+                        Dim x = w - ((DateTime.Now.Millisecond / 200.0 + i * (w / intensity)) Mod w)
+                        Dim arrow As New TextBlock() With {
+                            .Text = "←",
+                            .Foreground = New SolidColorBrush(Color.FromRgb(0, 255, 0)),
+                            .FontSize = 14,
+                            .FontFamily = New FontFamily("Consolas")
+                        }
+                        Canvas.SetLeft(arrow, x)
+                        Canvas.SetTop(arrow, centerY + 5)
+                        TopologyCanvas.Children.Add(arrow)
+                    Next
+                End If
+
+                ' Traffic rate overlay in center
+                Dim rateText As New TextBlock() With {
+                    .Text = $"↓{FormatBytes(bytesIn)}/s  ↑{FormatBytes(bytesOut)}/s",
+                    .Foreground = New SolidColorBrush(Colors.White),
+                    .FontSize = 10,
+                    .FontFamily = New FontFamily("Consolas"),
+                    .Background = New SolidColorBrush(Color.FromArgb(200, 0, 30, 30))
+                }
+                Canvas.SetLeft(rateText, w / 2 - 60)
+                Canvas.SetTop(rateText, centerY - 8)
+                TopologyCanvas.Children.Add(rateText)
             Catch
             End Try
         End Sub

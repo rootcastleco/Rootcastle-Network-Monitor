@@ -1,0 +1,21 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+C:\Appdev\Rootcastle-Network-Monitor\WPF\MainWindow.xaml.vb(329,21): error BC30269: 'Private Sub UpdateTrafficHistory(bytesIn As Long, bytesOut As Long)' has multiple definitions with identical signatures. [C:\Appdev\Rootcastle-Network-Monitor\WPF\RootcastleNetworkMonitor.vbproj]
+C:\Appdev\Rootcastle-Network-Monitor\WPF\MainWindow.xaml.vb(341,21): error BC30269: 'Private Sub DrawTrafficGraph()' has multiple definitions with identical signatures. [C:\Appdev\Rootcastle-Network-Monitor\WPF\RootcastleNetworkMonitor.vbproj]
+C:\Appdev\Rootcastle-Network-Monitor\WPF\MainWindow.xaml.vb(384,21): error BC30269: 'Private Sub UpdateProtocolCounters(totalBytes As Long)' has multiple definitions with identical signatures. [C:\Appdev\Rootcastle-Network-Monitor\WPF\RootcastleNetworkMonitor.vbproj]
+C:\Appdev\Rootcastle-Network-Monitor\WPF\MainWindow.xaml.vb(409,26): error BC30269: 'Private Function FormatCount(count As Long) As String' has multiple definitions with identical signatures. [C:\Appdev\Rootcastle-Network-Monitor\WPF\RootcastleNetworkMonitor.vbproj]
+C:\Appdev\Rootcastle-Network-Monitor\WPF\MainWindow.xaml.vb(415,27): error BC30269: 'Private Sub UpdateQoSMetrics()' has multiple definitions with identical signatures. [C:\Appdev\Rootcastle-Network-Monitor\WPF\RootcastleNetworkMonitor.vbproj]
+
+Build FAILED.
+
+C:\Appdev\Rootcastle-Network-Monitor\WPF\MainWindow.xaml.vb(329,21): error BC30269: 'Private Sub UpdateTrafficHistory(bytesIn As Long, bytesOut As Long)' has multiple definitions with identical signatures. [C:\Appdev\Rootcastle-Network-Monitor\WPF\RootcastleNetworkMonitor.vbproj]
+C:\Appdev\Rootcastle-Network-Monitor\WPF\MainWindow.xaml.vb(341,21): error BC30269: 'Private Sub DrawTrafficGraph()' has multiple definitions with identical signatures. [C:\Appdev\Rootcastle-Network-Monitor\WPF\RootcastleNetworkMonitor.vbproj]
+C:\Appdev\Rootcastle-Network-Monitor\WPF\MainWindow.xaml.vb(384,21): error BC30269: 'Private Sub UpdateProtocolCounters(totalBytes As Long)' has multiple definitions with identical signatures. [C:\Appdev\Rootcastle-Network-Monitor\WPF\RootcastleNetworkMonitor.vbproj]
+C:\Appdev\Rootcastle-Network-Monitor\WPF\MainWindow.xaml.vb(409,26): error BC30269: 'Private Function FormatCount(count As Long) As String' has multiple definitions with identical signatures. [C:\Appdev\Rootcastle-Network-Monitor\WPF\RootcastleNetworkMonitor.vbproj]
+C:\Appdev\Rootcastle-Network-Monitor\WPF\MainWindow.xaml.vb(415,27): error BC30269: 'Private Sub UpdateQoSMetrics()' has multiple definitions with identical signatures. [C:\Appdev\Rootcastle-Network-Monitor\WPF\RootcastleNetworkMonitor.vbproj]
+    0 Warning(s)
+    5 Error(s)
+
+Time Elapsed 00:00:01.60
+
+Workload updates are available. Run `dotnet workload list` for more information.

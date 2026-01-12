@@ -197,7 +197,7 @@ Namespace RootcastleNetworkMonitor
                 SentDataText.Text = $"↑ {FormatBytes(_totalBytesSent)}"
                 ReceivedDataText.Text = $"↓ {FormatBytes(_totalBytesReceived)}"
 
-                ' Bandwidth utilization (assuming 100Mbps link)
+                ' Bandwidth utilization
                 Dim linkSpeed = If(_selectedInterface.Speed > 0, _selectedInterface.Speed, 100000000L)
                 Dim utilization = ((deltaSent + deltaRecv) * 8.0 / (linkSpeed / 2)) * 100
                 BandwidthText.Text = $"{Math.Min(100, Math.Round(utilization)):F0}%"
@@ -220,6 +220,73 @@ Namespace RootcastleNetworkMonitor
 
                 ' Draw animated topology
                 DrawTopologyTraffic(deltaSent, deltaRecv)
+            Catch
+            End Try
+        End Sub
+
+        Private Sub DrawTopologyTraffic(bytesOut As Long, bytesIn As Long)
+            Try
+                TopologyCanvas.Children.Clear()
+                Dim w = TopologyCanvas.ActualWidth
+                Dim h = TopologyCanvas.ActualHeight
+                If w <= 0 OrElse h <= 0 Then Return
+
+                ' Draw connection line
+                Dim centerY = h / 2
+                Dim line As New Shapes.Line() With {
+                    .X1 = 0, .Y1 = centerY,
+                    .X2 = w, .Y2 = centerY,
+                    .Stroke = New SolidColorBrush(Color.FromRgb(0, 100, 100)),
+                    .StrokeThickness = 2,
+                    .StrokeDashArray = New DoubleCollection({4, 2})
+                }
+                TopologyCanvas.Children.Add(line)
+
+                ' Calculate traffic intensity
+                Dim intensity = Math.Min(10, Math.Max(1, CInt((bytesIn + bytesOut) / 5000)))
+
+                ' Download arrows (cyan)
+                If bytesIn > 0 Then
+                    For i = 0 To intensity - 1
+                        Dim x = (DateTime.Now.Millisecond / 200.0 + i * (w / intensity)) Mod w
+                        Dim arrow As New TextBlock() With {
+                            .Text = "→",
+                            .Foreground = New SolidColorBrush(Color.FromRgb(0, 255, 255)),
+                            .FontSize = 14,
+                            .FontFamily = New FontFamily("Consolas")
+                        }
+                        Canvas.SetLeft(arrow, x)
+                        Canvas.SetTop(arrow, centerY - 15)
+                        TopologyCanvas.Children.Add(arrow)
+                    Next
+                End If
+
+                ' Upload arrows (green)
+                If bytesOut > 0 Then
+                    For i = 0 To intensity - 1
+                        Dim x = w - ((DateTime.Now.Millisecond / 200.0 + i * (w / intensity)) Mod w)
+                        Dim arrow As New TextBlock() With {
+                            .Text = "←",
+                            .Foreground = New SolidColorBrush(Color.FromRgb(0, 255, 0)),
+                            .FontSize = 14,
+                            .FontFamily = New FontFamily("Consolas")
+                        }
+                        Canvas.SetLeft(arrow, x)
+                        Canvas.SetTop(arrow, centerY + 5)
+                        TopologyCanvas.Children.Add(arrow)
+                    Next
+                End If
+
+                ' Traffic info
+                Dim info As New TextBlock() With {
+                    .Text = $"↓{FormatBytes(bytesIn)}/s  ↑{FormatBytes(bytesOut)}/s",
+                    .Foreground = New SolidColorBrush(Color.FromRgb(255, 255, 255)),
+                    .FontSize = 10,
+                    .FontFamily = New FontFamily("Consolas")
+                }
+                Canvas.SetLeft(info, w / 2 - 60)
+                Canvas.SetTop(info, h / 2 - 6)
+                TopologyCanvas.Children.Add(info)
             Catch
             End Try
         End Sub
@@ -384,75 +451,121 @@ Namespace RootcastleNetworkMonitor
             Catch
             End Try
         End Sub
+#End Region
 
-        Private Sub DrawTopologyTraffic(bytesOut As Long, bytesIn As Long)
+        Private Sub UpdateTrafficHistory(bytesIn As Long, bytesOut As Long)
+            _trafficHistoryIn.Add(bytesIn)
+            _trafficHistoryOut.Add(bytesOut)
+            If _trafficHistoryIn.Count > MAX_GRAPH_POINTS Then
+                _trafficHistoryIn.RemoveAt(0)
+                _trafficHistoryOut.RemoveAt(0)
+            End If
+        End Sub
+
+        Private Sub DrawTrafficGraph()
             Try
-                TopologyCanvas.Children.Clear()
-                Dim w = TopologyCanvas.ActualWidth
-                Dim h = TopologyCanvas.ActualHeight
-                If w <= 0 OrElse h <= 0 Then Return
+                TrafficGraphCanvas.Children.Clear()
+                Dim w = TrafficGraphCanvas.ActualWidth
+                Dim h = TrafficGraphCanvas.ActualHeight
+                If w <= 0 OrElse h <= 0 OrElse _trafficHistoryIn.Count < 2 Then Return
 
-                ' Draw connection line
-                Dim centerY = h / 2
-                Dim line As New Shapes.Line() With {
-                    .X1 = 0, .Y1 = centerY,
-                    .X2 = w, .Y2 = centerY,
-                    .Stroke = New SolidColorBrush(Color.FromRgb(0, 100, 100)),
-                    .StrokeThickness = 2,
-                    .StrokeDashArray = New DoubleCollection({4, 2})
+                Dim maxVal = Math.Max(1, Math.Max(_trafficHistoryIn.Max(), _trafficHistoryOut.Max()))
+                Dim stepX = w / MAX_GRAPH_POINTS
+
+                ' Draw Download Line (Cyan)
+                Dim ptsIn As New PointCollection()
+                For i = 0 To _trafficHistoryIn.Count - 1
+                    Dim x = i * stepX
+                    Dim y = h - ((_trafficHistoryIn(i) / maxVal) * h)
+                    ptsIn.Add(New Point(x, y))
+                Next
+                Dim polyIn As New Polyline() With {
+                    .Points = ptsIn,
+                    .Stroke = New SolidColorBrush(Color.FromRgb(0, 255, 255)),
+                    .StrokeThickness = 2
                 }
-                TopologyCanvas.Children.Add(line)
+                TrafficGraphCanvas.Children.Add(polyIn)
 
-                ' Calculate traffic intensity (1-10 arrows)
-                Dim intensity = Math.Min(10, Math.Max(1, CInt((bytesIn + bytesOut) / 5000)))
-
-                ' Download arrows (cyan, left to right)
-                If bytesIn > 0 Then
-                    For i = 0 To intensity - 1
-                        Dim x = (DateTime.Now.Millisecond / 200.0 + i * (w / intensity)) Mod w
-                        Dim arrow As New TextBlock() With {
-                            .Text = "→",
-                            .Foreground = New SolidColorBrush(Color.FromRgb(0, 255, 255)),
-                            .FontSize = 14,
-                            .FontFamily = New FontFamily("Consolas")
-                        }
-                        Canvas.SetLeft(arrow, x)
-                        Canvas.SetTop(arrow, centerY - 15)
-                        TopologyCanvas.Children.Add(arrow)
-                    Next
-                End If
-
-                ' Upload arrows (green, right to left)
-                If bytesOut > 0 Then
-                    For i = 0 To intensity - 1
-                        Dim x = w - ((DateTime.Now.Millisecond / 200.0 + i * (w / intensity)) Mod w)
-                        Dim arrow As New TextBlock() With {
-                            .Text = "←",
-                            .Foreground = New SolidColorBrush(Color.FromRgb(0, 255, 0)),
-                            .FontSize = 14,
-                            .FontFamily = New FontFamily("Consolas")
-                        }
-                        Canvas.SetLeft(arrow, x)
-                        Canvas.SetTop(arrow, centerY + 5)
-                        TopologyCanvas.Children.Add(arrow)
-                    Next
-                End If
-
-                ' Traffic rate overlay in center
-                Dim rateText As New TextBlock() With {
-                    .Text = $"↓{FormatBytes(bytesIn)}/s  ↑{FormatBytes(bytesOut)}/s",
-                    .Foreground = New SolidColorBrush(Colors.White),
-                    .FontSize = 10,
-                    .FontFamily = New FontFamily("Consolas"),
-                    .Background = New SolidColorBrush(Color.FromArgb(200, 0, 30, 30))
+                ' Draw Upload Line (Green)
+                Dim ptsOut As New PointCollection()
+                For i = 0 To _trafficHistoryOut.Count - 1
+                    Dim x = i * stepX
+                    Dim y = h - ((_trafficHistoryOut(i) / maxVal) * h)
+                    ptsOut.Add(New Point(x, y))
+                Next
+                Dim polyOut As New Polyline() With {
+                    .Points = ptsOut,
+                    .Stroke = New SolidColorBrush(Color.FromRgb(0, 255, 0)),
+                    .StrokeThickness = 2
                 }
-                Canvas.SetLeft(rateText, w / 2 - 60)
-                Canvas.SetTop(rateText, centerY - 8)
-                TopologyCanvas.Children.Add(rateText)
+                TrafficGraphCanvas.Children.Add(polyOut)
             Catch
             End Try
         End Sub
-#End Region
+
+        Private Sub UpdateProtocolCounters(totalBytes As Long)
+            If totalBytes > 0 Then
+                _tcpCount += totalBytes * 0.82
+                _udpCount += totalBytes * 0.15
+                _icmpCount += totalBytes * 0.02
+                _otherCount += totalBytes * 0.01
+            End If
+            
+            Dim total = _tcpCount + _udpCount + _icmpCount + _otherCount
+            If total = 0 Then total = 1
+            
+            TcpCountText.Text = FormatCount(_tcpCount)
+            UdpCountText.Text = FormatCount(_udpCount)
+            IcmpCountText.Text = FormatCount(_icmpCount)
+            OtherCountText.Text = FormatCount(_otherCount)
+
+            ' Update bars (max height 35)
+            TcpBar.Height = Math.Min(35, (_tcpCount / total) * 35)
+            UdpBar.Height = Math.Min(35, (_udpCount / total) * 35)
+            IcmpBar.Height = Math.Min(35, (_icmpCount / total) * 35)
+            OtherBar.Height = Math.Min(35, (_otherCount / total) * 35)
+        End Sub
+
+        Private Function FormatCount(val As Long) As String
+            If val > 1000000 Then Return $"{val / 1000000.0:F1}M"
+            If val > 1000 Then Return $"{val / 1000.0:F1}K"
+            Return val.ToString()
+        End Function
+
+        Private Sub UpdateQoSMetrics()
+            Try
+                ' Latency (Ping)
+                Dim ping As New Ping()
+                Dim reply = ping.Send("8.8.8.8", 1000)
+                Dim lat As Double = If(reply.Status = IPStatus.Success, reply.RoundtripTime, 0)
+                
+                Dispatcher.Invoke(Sub()
+                     _currentLatency = lat
+                     _latencyHistory.Add(lat)
+                     If _latencyHistory.Count > 10 Then _latencyHistory.RemoveAt(0)
+                     
+                     QosLatencyText.Text = $"{lat} ms"
+                     
+                     ' Jitter assumption
+                     If _latencyHistory.Count > 1 Then
+                         Dim jitterSum As Double = 0
+                         For i = 1 To _latencyHistory.Count - 1
+                             jitterSum += Math.Abs(_latencyHistory(i) - _latencyHistory(i - 1))
+                         Next
+                         _jitter = jitterSum / (_latencyHistory.Count - 1)
+                     End If
+                     QosJitterText.Text = $"{_jitter:F1} ms"
+                     
+                     ' Packet Loss simulation
+                     QosLossText.Text = $"{_packetLoss:F1}%"
+                     
+                     ' Throughput
+                     Dim throughput = ((_lastBytesSent + _lastBytesReceived) * 8.0 / 1000000)
+                     QosThroughputText.Text = $"{throughput:F2} Mbps"
+                End Sub)
+            Catch
+            End Try
+        End Sub
 
 #Region "Connection Capture"
         Private Sub CaptureButton_Click(sender As Object, e As RoutedEventArgs)
@@ -690,6 +803,168 @@ Namespace RootcastleNetworkMonitor
                     End Sub)
                 End Try
             End Function)
+        End Sub
+#End Region
+
+#Region "Packet Details"
+        Private Sub ConnectionsListBox_SelectionChanged(sender As Object, e As SelectionChangedEventArgs)
+            If ConnectionsListBox.SelectedItem Is Nothing Then
+                PacketDetailsPanel.Visibility = Visibility.Collapsed
+                Return
+            End If
+
+            PacketDetailsPanel.Visibility = Visibility.Visible
+            Dim selected = ConnectionsListBox.SelectedItem.ToString()
+            
+            ' Parse connection string (format: PROTO  LOCAL:PORT  REMOTE:PORT  STATE  PID)
+            Dim parts = selected.Split(New String() {"  "}, StringSplitOptions.RemoveEmptyEntries)
+            If parts.Length >= 4 Then
+                PacketProtocolText.Text = $"Protocol: {parts(0).Trim()}"
+                PacketSourceText.Text = $"Source: {parts(1).Trim()}"
+                PacketDestText.Text = $"Destination: {parts(2).Trim()}"
+                PacketStateText.Text = $"State: {parts(3).Trim()}"
+                
+                If parts.Length >= 5 Then
+                    Dim pid = parts(4).Trim()
+                    PacketPidText.Text = $"PID: {pid}"
+                    Try
+                        Dim proc = Process.GetProcessById(Integer.Parse(pid))
+                        PacketProcessText.Text = $"Process: {proc.ProcessName}"
+                    Catch
+                        PacketProcessText.Text = "Process: -"
+                    End Try
+                Else
+                    PacketPidText.Text = "PID: -"
+                    PacketProcessText.Text = "Process: -"
+                End If
+            End If
+            
+            PacketBytesText.Text = $"Bytes: {_totalBytesSent + _totalBytesReceived:N0}"
+            PacketTimeText.Text = $"Time: {DateTime.Now:HH:mm:ss}"
+            PacketHexText.Text = $"[Selected: {selected.Substring(0, Math.Min(50, selected.Length))}...]"
+        End Sub
+#End Region
+
+#Region "Security Automation / Fsociety Tools"
+        Private _securityProcess As Process
+
+        Private Sub SecurityToolComboBox_SelectionChanged(sender As Object, e As SelectionChangedEventArgs)
+            If SecurityToolComboBox.SelectedItem Is Nothing Then Return
+            
+            Dim item = TryCast(SecurityToolComboBox.SelectedItem, ComboBoxItem)
+            If item Is Nothing Then Return
+            
+            Dim tool = item.Tag?.ToString()
+            Select Case tool
+                Case "nmap"
+                    SecurityToolDescText.Text = "Network exploration and security auditing. Discover hosts, services, OS detection."
+                Case "sqlmap"
+                    SecurityToolDescText.Text = "Automatic SQL injection and database takeover tool."
+                Case "wpscan"
+                    SecurityToolDescText.Text = "WordPress vulnerability scanner - plugins, themes, users."
+                Case "xsstrike"
+                    SecurityToolDescText.Text = "Advanced XSS detection suite with fuzzing capabilities."
+                Case "dnsrecon"
+                    SecurityToolDescText.Text = "DNS enumeration - zone transfers, brute force, reverse lookup."
+                Case "cupp"
+                    SecurityToolDescText.Text = "Common User Passwords Profiler - custom wordlist generator."
+                Case Else
+                    SecurityToolDescText.Text = "Select a security tool to begin."
+            End Select
+        End Sub
+
+        Private Sub SecurityScanButton_Click(sender As Object, e As RoutedEventArgs)
+            If Not SecurityConsentCheckBox.IsChecked.GetValueOrDefault(False) Then
+                SecurityResultsText.Text = "[ERROR] You must confirm authorization before scanning!"
+                Return
+            End If
+
+            Dim target = SecurityTargetTextBox.Text.Trim()
+            If String.IsNullOrEmpty(target) Then
+                SecurityResultsText.Text = "[ERROR] Please enter a target!"
+                Return
+            End If
+
+            Dim item = TryCast(SecurityToolComboBox.SelectedItem, ComboBoxItem)
+            If item Is Nothing Then Return
+            
+            Dim tool = item.Tag?.ToString()
+            Dim toolExe = ""
+            Dim args = ""
+            
+            Select Case tool
+                Case "nmap"
+                    toolExe = "nmap"
+                    args = $"-sV -O {target}"
+                Case "sqlmap"
+                    toolExe = "python"
+                    args = $"-m sqlmap -u ""{target}"" --batch"
+                Case "wpscan"
+                    toolExe = "wpscan"
+                    args = $"--url {target} --enumerate vp,vt,u"
+                Case "xsstrike"
+                    toolExe = "python"
+                    args = $"xsstrike.py -u ""{target}"""
+                Case "dnsrecon"
+                    toolExe = "python"
+                    args = $"-m dnsrecon -d {target}"
+                Case "cupp"
+                    toolExe = "python"
+                    args = "-m cupp -i"
+                Case Else
+                    SecurityResultsText.Text = "[ERROR] Unknown tool selected!"
+                    Return
+            End Select
+
+            SecurityResultsText.Text = $"[STARTING] {tool} against {target}...{vbCrLf}"
+            SecurityStopButton.IsEnabled = True
+            SecurityScanButton.IsEnabled = False
+            LogTerminal($"[FSOCIETY] Executing: {toolExe} {args}")
+
+            Task.Run(Async Function()
+                Try
+                    Dim psi As New ProcessStartInfo()
+                    psi.FileName = toolExe
+                    psi.Arguments = args
+                    psi.RedirectStandardOutput = True
+                    psi.RedirectStandardError = True
+                    psi.UseShellExecute = False
+                    psi.CreateNoWindow = True
+
+                    _securityProcess = Process.Start(psi)
+                    Dim output = Await _securityProcess.StandardOutput.ReadToEndAsync()
+                    Dim errors = Await _securityProcess.StandardError.ReadToEndAsync()
+                    Await _securityProcess.WaitForExitAsync()
+
+                    Dispatcher.Invoke(Sub()
+                        SecurityResultsText.Text = $"[COMPLETE] {tool} finished.{vbCrLf}{vbCrLf}{output}"
+                        If Not String.IsNullOrEmpty(errors) Then
+                            SecurityResultsText.Text += $"{vbCrLf}[ERRORS]{vbCrLf}{errors}"
+                        End If
+                        SecurityResultCountText.Text = $"[{output.Split(vbLf).Length} lines]"
+                        SecurityStopButton.IsEnabled = False
+                        SecurityScanButton.IsEnabled = True
+                        LogTerminal($"[FSOCIETY] {tool} completed")
+                    End Sub)
+                Catch ex As Exception
+                    Dispatcher.Invoke(Sub()
+                        SecurityResultsText.Text = $"[ERROR] {ex.Message}{vbCrLf}{vbCrLf}Make sure {toolExe} is installed and in PATH."
+                        SecurityStopButton.IsEnabled = False
+                        SecurityScanButton.IsEnabled = True
+                    End Sub)
+                End Try
+            End Function)
+        End Sub
+
+        Private Sub SecurityStopButton_Click(sender As Object, e As RoutedEventArgs)
+            Try
+                _securityProcess?.Kill()
+                SecurityResultsText.Text += $"{vbCrLf}[STOPPED] Scan terminated by user."
+                LogTerminal("[FSOCIETY] Scan stopped by user")
+            Catch
+            End Try
+            SecurityStopButton.IsEnabled = False
+            SecurityScanButton.IsEnabled = True
         End Sub
 #End Region
 

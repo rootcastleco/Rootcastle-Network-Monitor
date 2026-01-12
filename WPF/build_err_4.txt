@@ -1,0 +1,13 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+C:\Appdev\Rootcastle-Network-Monitor\WPF\MainWindow.xaml(547,68): error MC3072: The property 'pADDING' does not exist in XML namespace 'http://schemas.microsoft.com/winfx/2006/xaml/presentation'. Line 547 Position 68. [C:\Appdev\Rootcastle-Network-Monitor\WPF\RootcastleNetworkMonitor.vbproj]
+
+Build FAILED.
+
+C:\Appdev\Rootcastle-Network-Monitor\WPF\MainWindow.xaml(547,68): error MC3072: The property 'pADDING' does not exist in XML namespace 'http://schemas.microsoft.com/winfx/2006/xaml/presentation'. Line 547 Position 68. [C:\Appdev\Rootcastle-Network-Monitor\WPF\RootcastleNetworkMonitor.vbproj]
+    0 Warning(s)
+    1 Error(s)
+
+Time Elapsed 00:00:01.19
+
+Workload updates are available. Run `dotnet workload list` for more information.

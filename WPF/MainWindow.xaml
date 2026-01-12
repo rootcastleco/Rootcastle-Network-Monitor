@@ -242,7 +242,36 @@
                                     </StackPanel>
                                     <Button x:Name="CaptureButton" Content="● CAPTURE" Background="#330000" Foreground="#FF4444" BorderBrush="#FF4444" HorizontalAlignment="Right" Padding="8,4" Click="CaptureButton_Click"/>
                                 </Grid>
-                                <ListBox x:Name="ConnectionsListBox" Height="140" Background="#050505" Foreground="#00FF00" FontFamily="Consolas" FontSize="10"/>
+                                <ListBox x:Name="ConnectionsListBox" Height="140" Background="#050505" Foreground="#00FF00" FontFamily="Consolas" FontSize="10" SelectionChanged="ConnectionsListBox_SelectionChanged"/>
+                                
+                                <!-- Packet Details Panel -->
+                                <StackPanel x:Name="PacketDetailsPanel" Visibility="Collapsed" Margin="0,10,0,0" Background="#020800">
+                                    <Border BorderBrush="#005500" BorderThickness="1" Padding="8" CornerRadius="3">
+                                        <StackPanel>
+                                            <TextBlock Text="► PACKET DETAILS" FontSize="11" Foreground="#00FF00" FontFamily="Consolas" FontWeight="Bold" Margin="0,0,0,6"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock x:Name="PacketProtocolText" Text="Protocol: -" Foreground="#88FF88" FontFamily="Consolas" FontSize="10"/>
+                                                    <TextBlock x:Name="PacketSourceText" Text="Source: -" Foreground="#88FF88" FontFamily="Consolas" FontSize="10"/>
+                                                    <TextBlock x:Name="PacketDestText" Text="Destination: -" Foreground="#88FF88" FontFamily="Consolas" FontSize="10"/>
+                                                    <TextBlock x:Name="PacketStateText" Text="State: -" Foreground="#88FF88" FontFamily="Consolas" FontSize="10"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock x:Name="PacketPidText" Text="PID: -" Foreground="#88FF88" FontFamily="Consolas" FontSize="10"/>
+                                                    <TextBlock x:Name="PacketProcessText" Text="Process: -" Foreground="#88FF88" FontFamily="Consolas" FontSize="10"/>
+                                                    <TextBlock x:Name="PacketBytesText" Text="Bytes: -" Foreground="#88FF88" FontFamily="Consolas" FontSize="10"/>
+                                                    <TextBlock x:Name="PacketTimeText" Text="Time: -" Foreground="#88FF88" FontFamily="Consolas" FontSize="10"/>
+                                                </StackPanel>
+                                            </Grid>
+                                            <TextBlock Text="HEX Dump:" Foreground="#666" FontFamily="Consolas" FontSize="9" Margin="0,6,0,2"/>
+                                            <TextBlock x:Name="PacketHexText" Text="[No Data]" Foreground="#444" FontFamily="Consolas" FontSize="9" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -457,6 +486,71 @@
                                     <Button Content="🔍 Top Talkers" Background="#001530" Foreground="#00CCFF" BorderBrush="#00CCFF" Padding="8,4" Margin="0,0,8,8" Tag="toptalkers" Click="AIQuickAction_Click"/>
                                     <Button Content="⚠️ Incident" Background="#001530" Foreground="#00CCFF" BorderBrush="#00CCFF" Padding="8,4" Margin="0,0,8,8" Tag="incident" Click="AIQuickAction_Click"/>
                                 </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            
+            <!-- FSOCIETY TAB -->
+            <TabItem Header="💀 FSOCIETY" Background="#110000">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="8">
+                        <Border Background="#050000" BorderBrush="#FF0000" BorderThickness="2" CornerRadius="4" Padding="12">
+                            <StackPanel>
+                                <TextBlock Text="FSOCIETY // SECURITY AUTOMATION" FontSize="18" Foreground="#FF0000" FontFamily="Consolas" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,15"/>
+                                
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="2*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="SELECT TOOL:" Foreground="#FF4444" VerticalAlignment="Center" FontFamily="Consolas"/>
+                                    <ComboBox x:Name="SecurityToolComboBox" Grid.Column="1" SelectionChanged="SecurityToolComboBox_SelectionChanged">
+                                        <ComboBoxItem Content="NMAP (Network Mapper)" Tag="nmap" IsSelected="True"/>
+                                        <ComboBoxItem Content="SQLMap (DB Injection)" Tag="sqlmap"/>
+                                        <ComboBoxItem Content="WPScan (WordPress)" Tag="wpscan"/>
+                                        <ComboBoxItem Content="XSStrike (XSS Fuzzer)" Tag="xsstrike"/>
+                                        <ComboBoxItem Content="DNSRecon (DNS Enum)" Tag="dnsrecon"/>
+                                        <ComboBoxItem Content="CUPP (Password Profiler)" Tag="cupp"/>
+                                    </ComboBox>
+                                </Grid>
+
+                                <Border Background="#100000" BorderBrush="#330000" BorderThickness="1" Padding="8" Margin="0,0,0,10">
+                                    <TextBlock x:Name="SecurityToolDescText" Text="Select a tool to view description." Foreground="#884444" FontFamily="Consolas" TextWrapping="Wrap" FontStyle="Italic"/>
+                                </Border>
+
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="2*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="TARGET TYPE:" Foreground="#FF4444" VerticalAlignment="Center" FontFamily="Consolas"/>
+                                    <TextBox x:Name="SecurityTargetTextBox" Grid.Column="1" Text="127.0.0.1" Background="#100000" Foreground="#FF0000" FontFamily="Consolas" BorderBrush="#550000"/>
+                                </Grid>
+
+                                <CheckBox x:Name="SecurityConsentCheckBox" Margin="0,0,0,15">
+                                    <TextBlock Text="I have explicit written permission to test this target." Foreground="#FF8800" FontFamily="Consolas" FontWeight="Bold"/>
+                                </CheckBox>
+
+                                <Grid Margin="0,0,0,15">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button x:Name="SecurityScanButton" Content="INIITATE HACK" Background="#220000" Foreground="#FF4444" BorderBrush="#FF4444" Padding="10" Click="SecurityScanButton_Click" Margin="0,0,5,0"/>
+                                    <Button x:Name="SecurityStopButton" Grid.Column="1" Content="ABORT" Background="#220000" Foreground="#880000" BorderBrush="#880000" Padding="10" Click="SecurityStopButton_Click" IsEnabled="False" Margin="5,0,0,0"/>
+                                </Grid>
+
+                                <Border Background="#050000" BorderBrush="#440000" BorderThickness="1" CornerRadius="2">
+                                    <StackPanel>
+                                        <Grid Background="#100000" Padding="5">
+                                            <TextBlock Text="TERMINAL OUTPUT" Foreground="#660000" FontFamily="Consolas" FontSize="10"/>
+                                            <TextBlock x:Name="SecurityResultCountText" Text="-" Foreground="#660000" FontFamily="Consolas" FontSize="10" HorizontalAlignment="Right"/>
+                                        </Grid>
+                                        <TextBox x:Name="SecurityResultsText" Height="200" Background="#000000" Foreground="#00FF00" FontFamily="Consolas" FontSize="11" IsReadOnly="True" VerticalScrollBarVisibility="Auto" BorderThickness="0" Padding="5"/>
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
                         </Border>
                     </StackPanel>

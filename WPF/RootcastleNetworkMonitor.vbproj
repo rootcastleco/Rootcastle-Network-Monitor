@@ -5,7 +5,6 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <RootNamespace>RootcastleNetworkMonitor</RootNamespace>
     <UseWPF>true</UseWPF>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>logo.ico</ApplicationIcon>
     <AssemblyName>RootcastleNetworkMonitor</AssemblyName>
     <Company>Rootcastle Engineering &amp; Innovation</Company>

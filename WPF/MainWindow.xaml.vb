@@ -10,7 +10,8 @@ Imports Newtonsoft.Json
 Imports Newtonsoft.Json.Linq
 Imports System.ComponentModel
 
-Class MainWindow
+Namespace RootcastleNetworkMonitor
+    Class MainWindow
 
 #Region "Fields"
     ' Network
@@ -790,4 +791,5 @@ Class MainWindow
     End Sub
 #End Region
 
-End Class
+    End Class
+End Namespace

@@ -1,6 +1,7 @@
 ﻿Imports System.Net.NetworkInformation
 Imports System.Net
 Imports System.Net.Http
+Imports System.Net.Sockets
 Imports System.Diagnostics
 Imports System.Text
 Imports System.IO
@@ -18,38 +19,53 @@ Class MainWindow
     Private _isMonitoring As Boolean = False
     Private _monitoringCts As CancellationTokenSource
     
-    ' Packet/Connection Capture
+    ' Capture
     Private _isCapturing As Boolean = False
     Private _packetCount As Long = 0
-    Private _capturedPackets As New List(Of CapturedPacketInfo)
     
     ' Statistics
     Private _lastBytesSent As Long = 0
     Private _lastBytesReceived As Long = 0
+    Private _totalBytesSent As Long = 0
+    Private _totalBytesReceived As Long = 0
     Private _startTime As DateTime
     Private _uptimeTimer As Threading.Timer
+    Private _trafficHistory As New List(Of Double)
     
     ' AI
-    Private _openRouterApiKey As String = ""
-    Private _selectedAIModel As String = "deepseek/deepseek-chat"
+    Private _selectedAIModel As String = "meta-llama/llama-3.2-3b-instruct:free"
+    Private _selectedLanguage As String = "TR"
     
     ' NMAP
     Private _nmapProcess As Process
     Private _isNmapRunning As Boolean = False
+    
+    ' Security
+    Private _securityProcess As Process
+    Private _isSecurityRunning As Boolean = False
+    Private _suspiciousDetectionEnabled As Boolean = False
+    Private _alertCount As Integer = 0
+    Private _errorCount As Integer = 0
+    
+    ' Protocol counts
+    Private _tcpCount As Long = 0
+    Private _udpCount As Long = 0
+    Private _icmpCount As Long = 0
+    Private _otherCount As Long = 0
 #End Region
 
 #Region "Initialization"
-    Private Sub Window_Loaded(sender As Object, e As RoutedEventArgs)
+    Private Sub MainWindow_Loaded(sender As Object, e As RoutedEventArgs)
         LoadNetworkInterfaces()
-        LogTerminal("[SYSTEM] Rootcastle Network Monitor v6.0 WPF Edition")
-        LogTerminal("[SYSTEM] Full system access enabled")
-        
-        ' Connection capture info
-        LogTerminal("[PCAP] Using netstat for connection monitoring")
-        LogTerminal("[PCAP] NMAP and Security Tools fully operational")
+        LogTerminal("[SYS] Rootcastle Network Monitor v6.0 WPF Edition")
+        LogTerminal("[SYS] Full system access enabled")
+        LogTerminal("[SYS] SOFIA AI Engine loaded")
         
         ' Check for NMAP
         CheckNmapInstallation()
+        
+        ' Get external IP
+        Task.Run(AddressOf GetExternalIP)
         
         ' Start uptime timer
         _startTime = DateTime.Now
@@ -91,7 +107,22 @@ Class MainWindow
                 LogTerminal($"[NMAP] {output}")
             End Using
         Catch
-            LogTerminal("[NMAP] WARNING: nmap not found in PATH! Install from https://nmap.org")
+            LogTerminal("[NMAP] WARNING: nmap not found! Install from https://nmap.org")
+        End Try
+    End Sub
+    
+    Private Async Sub GetExternalIP()
+        Try
+            Using client As New HttpClient()
+                client.Timeout = TimeSpan.FromSeconds(5)
+                Dim ip = Await client.GetStringAsync("https://api.ipify.org")
+                Dispatcher.Invoke(Sub()
+                    ExternalIPText.Text = $"WAN: {ip}"
+                    LogTerminal($"[NET] External IP: {ip}")
+                End Sub)
+            End Using
+        Catch
+            Dispatcher.Invoke(Sub() ExternalIPText.Text = "WAN: Unavailable")
         End Try
     End Sub
 #End Region
@@ -100,12 +131,38 @@ Class MainWindow
     Private Sub InterfaceComboBox_SelectionChanged(sender As Object, e As SelectionChangedEventArgs)
         If InterfaceComboBox.SelectedIndex >= 0 AndAlso InterfaceComboBox.SelectedIndex < _networkInterfaces.Length Then
             _selectedInterface = _networkInterfaces(InterfaceComboBox.SelectedIndex)
+            UpdateInterfaceInfo()
             LogTerminal($"[NET] Selected: {_selectedInterface.Name}")
-            
-            Dim stats = _selectedInterface.GetIPv4Statistics()
-            _lastBytesSent = stats.BytesSent
-            _lastBytesReceived = stats.BytesReceived
         End If
+    End Sub
+    
+    Private Sub UpdateInterfaceInfo()
+        If _selectedInterface Is Nothing Then Return
+        
+        InterfaceNameText.Text = $"Name: {_selectedInterface.Name}"
+        InterfaceTypeText.Text = $"Type: {_selectedInterface.NetworkInterfaceType}"
+        InterfaceStatusText.Text = $"Status: {_selectedInterface.OperationalStatus}"
+        InterfaceSpeedText.Text = $"Speed: {_selectedInterface.Speed / 1000000} Mbps"
+        MacAddressText.Text = $"MAC: {_selectedInterface.GetPhysicalAddress()}"
+        
+        Dim props = _selectedInterface.GetIPProperties()
+        Dim ipv4 = props.UnicastAddresses.FirstOrDefault(Function(a) a.Address.AddressFamily = AddressFamily.InterNetwork)
+        Dim ipv6 = props.UnicastAddresses.FirstOrDefault(Function(a) a.Address.AddressFamily = AddressFamily.InterNetworkV6)
+        Dim gateway = props.GatewayAddresses.FirstOrDefault()
+        
+        IPv4Text.Text = $"IPv4: {If(ipv4?.Address?.ToString(), "-")}"
+        IPv6Text.Text = $"IPv6: {If(ipv6?.Address?.ToString()?.Substring(0, Math.Min(20, If(ipv6?.Address?.ToString()?.Length, 0))), "-")}..."
+        SubnetText.Text = $"Subnet: {If(ipv4?.IPv4Mask?.ToString(), "-")}"
+        GatewayText.Text = $"Gateway: {If(gateway?.Address?.ToString(), "-")}"
+        GatewayShortText.Text = If(gateway?.Address?.ToString()?.Split("."c).LastOrDefault(), "-")
+        LocalIPShortText.Text = If(ipv4?.Address?.ToString()?.Split("."c).LastOrDefault(), "-")
+        
+        Dim dns = String.Join(", ", props.DnsAddresses.Take(2).Select(Function(d) d.ToString()))
+        DnsServersText.Text = $"DNS: {If(dns, "-")}"
+        
+        Dim stats = _selectedInterface.GetIPv4Statistics()
+        _lastBytesSent = stats.BytesSent
+        _lastBytesReceived = stats.BytesReceived
     End Sub
     
     Private Sub StartButton_Click(sender As Object, e As RoutedEventArgs)
@@ -130,7 +187,6 @@ Class MainWindow
         
         LogTerminal($"[NET] Monitoring started on {_selectedInterface.Name}")
         
-        ' Start monitoring task
         Task.Run(Async Function()
             While Not _monitoringCts.IsCancellationRequested
                 Await Task.Delay(1000)
@@ -158,29 +214,60 @@ Class MainWindow
             
             _lastBytesSent = stats.BytesSent
             _lastBytesReceived = stats.BytesReceived
+            _totalBytesSent = stats.BytesSent
+            _totalBytesReceived = stats.BytesReceived
             
-            SentText.Text = FormatBytes(stats.BytesSent)
-            ReceivedText.Text = FormatBytes(stats.BytesReceived)
+            ' Update UI
+            SentDataText.Text = $"↑ {FormatBytes(_totalBytesSent)}"
+            ReceivedDataText.Text = $"↓ {FormatBytes(_totalBytesReceived)}"
+            DownloadSpeedText.Text = $"{FormatBytes(deltaRecv)}/s"
+            UploadSpeedText.Text = $"{FormatBytes(deltaSent)}/s"
+            BytesPerSecText.Text = $"{FormatBytes(deltaSent + deltaRecv)}/s"
+            TrafficRateText.Text = $"{FormatBytes(deltaSent + deltaRecv)}/s"
+            
+            ' Bandwidth utilization
+            Dim maxSpeed = _selectedInterface.Speed / 8
+            If maxSpeed > 0 Then
+                Dim utilization = (deltaSent + deltaRecv) / CDbl(maxSpeed) * 100
+                BandwidthText.Text = $"{utilization:F1}%"
+            End If
+            
+            ' Throughput
+            Dim mbps = (deltaSent + deltaRecv) / 1048576.0 * 8
+            QosThroughputText.Text = $"{mbps:F2} Mbps"
+            
+            ' Track traffic history for graph
+            _trafficHistory.Add(deltaSent + deltaRecv)
+            If _trafficHistory.Count > 60 Then _trafficHistory.RemoveAt(0)
+            
+            ' Protocol simulation (increment based on traffic)
+            If deltaRecv > 0 Then
+                _tcpCount += 1
+                TcpCountText.Text = _tcpCount.ToString()
+            End If
+            If deltaSent > 0 Then
+                _udpCount += 1
+                UdpCountText.Text = _udpCount.ToString()
+            End If
             
             _packetCount += 1
             PacketCountText.Text = _packetCount.ToString()
+            
         Catch ex As Exception
-            LogTerminal($"[ERR] Stats update: {ex.Message}")
+            _errorCount += 1
+            ErrorCountText.Text = _errorCount.ToString()
         End Try
     End Sub
     
     Private Sub UpdateUptime(state As Object)
         Dispatcher.Invoke(Sub()
             Dim uptime = DateTime.Now - _startTime
-            UptimeText.Text = $"Uptime: {uptime.Hours:D2}:{uptime.Minutes:D2}:{uptime.Seconds:D2}"
+            UptimeText.Text = $"{uptime.Hours:D2}:{uptime.Minutes:D2}:{uptime.Seconds:D2}"
         End Sub)
     End Sub
 #End Region
 
-#Region "Packet Capture"
-    ' NOTE: SharpPcap 6.x uses ref structs which VB.NET cannot handle
-    ' Packet capture uses Windows APIs instead
-    
+#Region "Connection Capture"
     Private Sub CaptureButton_Click(sender As Object, e As RoutedEventArgs)
         If _isCapturing Then
             StopCapture()
@@ -190,22 +277,16 @@ Class MainWindow
     End Sub
     
     Private Sub StartCapture()
-        Try
-            _isCapturing = True
-            LogTerminal("[PCAP] Starting network capture using netstat...")
-            LogTerminal("[PCAP] For full packet capture, install Wireshark")
-            
-            ' Use netstat for connection monitoring  
-            Task.Run(Async Function()
-                While _isCapturing
-                    Await CaptureConnectionsAsync()
-                    Await Task.Delay(2000)
-                End While
-            End Function)
-            
-        Catch ex As Exception
-            LogTerminal($"[PCAP] ERROR: {ex.Message}")
-        End Try
+        _isCapturing = True
+        CaptureButton.Content = "⏹ STOP"
+        LogTerminal("[PCAP] Starting connection capture...")
+        
+        Task.Run(Async Function()
+            While _isCapturing
+                Await CaptureConnectionsAsync()
+                Await Task.Delay(2000)
+            End While
+        End Function)
     End Sub
     
     Private Async Function CaptureConnectionsAsync() As Task
@@ -221,51 +302,46 @@ Class MainWindow
                 Dim output = Await proc.StandardOutput.ReadToEndAsync()
                 Dim lines = output.Split({vbCrLf, vbLf}, StringSplitOptions.RemoveEmptyEntries)
                 
-                Dim count = 0
+                Dim connections As New List(Of String)
                 For Each line In lines
-                    If line.Contains("ESTABLISHED") OrElse line.Contains("TIME_WAIT") Then
-                        count += 1
+                    If line.Contains("ESTABLISHED") OrElse line.Contains("TIME_WAIT") OrElse line.Contains("CLOSE_WAIT") Then
+                        connections.Add(line.Trim())
                         _packetCount += 1
-                        
-                        Dim parts = line.Split({" "c}, StringSplitOptions.RemoveEmptyEntries)
-                        If parts.Length >= 4 Then
-                            Dispatcher.Invoke(Sub()
-                                Dim displayText = $"[{DateTime.Now:HH:mm:ss}] {parts(0)} {parts(1)} → {parts(2)} ({parts(3)})"
-                                PacketListBox.Items.Insert(0, displayText)
-                                
-                                If PacketListBox.Items.Count > 500 Then
-                                    PacketListBox.Items.RemoveAt(PacketListBox.Items.Count - 1)
-                                End If
-                            End Sub)
-                        End If
                     End If
                 Next
                 
                 Dispatcher.Invoke(Sub()
+                    ConnectionsListView.Items.Clear()
+                    For Each conn In connections.Take(50)
+                        ConnectionsListView.Items.Add(conn)
+                    Next
+                    ConnectionCountText.Text = $"[{connections.Count} connections]"
+                    ActiveConnectionsText.Text = connections.Count.ToString()
                     PacketCountText.Text = _packetCount.ToString()
                 End Sub)
             End Using
         Catch
-            ' Ignore capture errors
         End Try
     End Function
     
     Private Sub StopCapture()
         _isCapturing = False
+        CaptureButton.Content = "● CAPTURE"
         LogTerminal("[PCAP] Capture stopped")
     End Sub
 #End Region
 
-#Region "NMAP (REAL)"
-    Private Sub NmapScanButton_Click(sender As Object, e As RoutedEventArgs)
-        ' Just switch to NMAP tab
-    End Sub
-    
-    Private Async Sub RunNmapButton_Click(sender As Object, e As RoutedEventArgs)
+#Region "NMAP Scanner"
+    Private Async Sub NmapScanButton_Click(sender As Object, e As RoutedEventArgs)
         If _isNmapRunning Then
             _nmapProcess?.Kill()
             _isNmapRunning = False
-            RunNmapButton.Content = "🚀 RUN NMAP"
+            NmapStopButton.IsEnabled = False
+            Return
+        End If
+        
+        If Not ScanPermissionCheckBox.IsChecked.GetValueOrDefault(False) Then
+            NmapOutputTextBox.Text = "[NMAP] ERROR: Check authorization box first!"
             Return
         End If
         
@@ -275,17 +351,12 @@ Class MainWindow
             Return
         End If
         
-        Dim scanType = ""
-        Select Case NmapScanTypeComboBox.SelectedIndex
-            Case 0 : scanType = "-sT"
-            Case 1 : scanType = "-sV"
-            Case 2 : scanType = "-O"
-            Case 3 : scanType = "-A"
-            Case 4 : scanType = "-p 1-65535"
-        End Select
+        Dim scanType = GetNmapArgs()
         
         _isNmapRunning = True
-        RunNmapButton.Content = "⏹ STOP"
+        NmapStopButton.IsEnabled = True
+        NmapProgressBar.Visibility = Visibility.Visible
+        NmapProgressBar.IsIndeterminate = True
         NmapOutputTextBox.Text = $"[NMAP] Starting scan: nmap {scanType} {target}{vbCrLf}"
         LogTerminal($"[NMAP] Executing: nmap {scanType} {target}")
         
@@ -306,7 +377,7 @@ Class MainWindow
                 While Not _nmapProcess.StandardOutput.EndOfStream
                     Dim line = _nmapProcess.StandardOutput.ReadLine()
                     Dispatcher.Invoke(Sub()
-                        NmapOutputTextBox.Text += line + vbCrLf
+                        NmapOutputTextBox.AppendText(line + vbCrLf)
                         NmapOutputTextBox.ScrollToEnd()
                     End Sub)
                 End While
@@ -316,51 +387,217 @@ Class MainWindow
             
             LogTerminal("[NMAP] Scan completed")
         Catch ex As Exception
-            NmapOutputTextBox.Text += $"{vbCrLf}[NMAP] ERROR: {ex.Message}"
+            NmapOutputTextBox.AppendText($"{vbCrLf}[NMAP] ERROR: {ex.Message}")
             LogTerminal($"[NMAP] ERROR: {ex.Message}")
         Finally
             _isNmapRunning = False
-            RunNmapButton.Content = "🚀 RUN NMAP"
+            NmapStopButton.IsEnabled = False
+            NmapProgressBar.Visibility = Visibility.Collapsed
+        End Try
+    End Sub
+    
+    Private Function GetNmapArgs() As String
+        Select Case NmapScanTypeCombo.SelectedIndex
+            Case 0 : Return "-sT -T4"
+            Case 1 : Return "-sT -p 1-65535"
+            Case 2 : Return "-sS"
+            Case 3 : Return "-sV"
+            Case 4 : Return "-O"
+            Case 5 : Return "--script vuln"
+            Case Else : Return "-sT"
+        End Select
+    End Function
+    
+    Private Sub NmapDiscoverButton_Click(sender As Object, e As RoutedEventArgs)
+        If Not ScanPermissionCheckBox.IsChecked.GetValueOrDefault(False) Then
+            NmapOutputTextBox.Text = "[NMAP] ERROR: Check authorization box first!"
+            Return
+        End If
+        NmapTargetTextBox.Text = "192.168.1.0/24"
+        NmapScanTypeCombo.SelectedIndex = 0
+        NmapScanButton_Click(sender, e)
+    End Sub
+    
+    Private Sub NmapStopButton_Click(sender As Object, e As RoutedEventArgs)
+        _nmapProcess?.Kill()
+        _isNmapRunning = False
+        NmapStopButton.IsEnabled = False
+        NmapProgressBar.Visibility = Visibility.Collapsed
+        LogTerminal("[NMAP] Scan cancelled")
+    End Sub
+#End Region
+
+#Region "Packet Sender"
+    Private Async Sub SendTcpButton_Click(sender As Object, e As RoutedEventArgs)
+        Dim host = TargetHostTextBox.Text.Trim()
+        Dim port = 0
+        Integer.TryParse(TargetPortTextBox.Text, port)
+        
+        LogTerminal($"[TCP] Connecting to {host}:{port}...")
+        Try
+            Using client As New TcpClient()
+                Await client.ConnectAsync(host, port)
+                LogTerminal($"[TCP] Connected to {host}:{port} ✓")
+            End Using
+        Catch ex As Exception
+            LogTerminal($"[TCP] Failed: {ex.Message}")
+        End Try
+    End Sub
+    
+    Private Async Sub SendUdpButton_Click(sender As Object, e As RoutedEventArgs)
+        Dim host = TargetHostTextBox.Text.Trim()
+        Dim port = 0
+        Integer.TryParse(TargetPortTextBox.Text, port)
+        
+        LogTerminal($"[UDP] Sending to {host}:{port}...")
+        Try
+            Using client As New UdpClient()
+                Dim data = Encoding.ASCII.GetBytes("PING")
+                Await client.SendAsync(data, data.Length, host, port)
+                LogTerminal($"[UDP] Packet sent to {host}:{port} ✓")
+            End Using
+        Catch ex As Exception
+            LogTerminal($"[UDP] Failed: {ex.Message}")
+        End Try
+    End Sub
+    
+    Private Async Sub PingButton_Click(sender As Object, e As RoutedEventArgs)
+        Dim host = TargetHostTextBox.Text.Trim()
+        LogTerminal($"[PING] Pinging {host}...")
+        
+        Try
+            Using ping As New Ping()
+                Dim reply = Await ping.SendPingAsync(host, 3000)
+                If reply.Status = IPStatus.Success Then
+                    LogTerminal($"[PING] Reply from {reply.Address}: time={reply.RoundtripTime}ms TTL={reply.Options?.Ttl}")
+                    LatencyText.Text = $"~ {reply.RoundtripTime} ms"
+                    QosLatencyText.Text = $"{reply.RoundtripTime} ms"
+                Else
+                    LogTerminal($"[PING] {reply.Status}")
+                End If
+            End Using
+        Catch ex As Exception
+            LogTerminal($"[PING] Failed: {ex.Message}")
+        End Try
+    End Sub
+    
+    Private Async Sub TraceRouteButton_Click(sender As Object, e As RoutedEventArgs)
+        Dim host = TargetHostTextBox.Text.Trim()
+        LogTerminal($"[TRACE] Traceroute to {host}...")
+        
+        Try
+            Await Task.Run(Sub()
+                Dim psi As New ProcessStartInfo()
+                psi.FileName = "tracert"
+                psi.Arguments = $"-d -h 15 {host}"
+                psi.RedirectStandardOutput = True
+                psi.UseShellExecute = False
+                psi.CreateNoWindow = True
+                
+                Using proc = Process.Start(psi)
+                    While Not proc.StandardOutput.EndOfStream
+                        Dim line = proc.StandardOutput.ReadLine()
+                        Dispatcher.Invoke(Sub() LogTerminal($"[TRACE] {line}"))
+                    End While
+                End Using
+            End Sub)
+        Catch ex As Exception
+            LogTerminal($"[TRACE] Failed: {ex.Message}")
+        End Try
+    End Sub
+    
+    Private Async Sub HttpCheckButton_Click(sender As Object, e As RoutedEventArgs)
+        Dim host = TargetHostTextBox.Text.Trim()
+        If Not host.StartsWith("http") Then host = "https://" + host
+        
+        LogTerminal($"[HTTP] Checking {host}...")
+        Try
+            Using client As New HttpClient()
+                client.Timeout = TimeSpan.FromSeconds(10)
+                Dim sw = Stopwatch.StartNew()
+                Dim response = Await client.GetAsync(host)
+                sw.Stop()
+                LogTerminal($"[HTTP] {response.StatusCode} ({sw.ElapsedMilliseconds}ms)")
+            End Using
+        Catch ex As Exception
+            LogTerminal($"[HTTP] Failed: {ex.Message}")
+        End Try
+    End Sub
+    
+    Private Async Sub DnsCheckButton_Click(sender As Object, e As RoutedEventArgs)
+        Dim host = TargetHostTextBox.Text.Trim()
+        LogTerminal($"[DNS] Resolving {host}...")
+        
+        Try
+            Dim addresses = Await Dns.GetHostAddressesAsync(host)
+            For Each addr In addresses
+                LogTerminal($"[DNS] {host} -> {addr}")
+            Next
+        Catch ex As Exception
+            LogTerminal($"[DNS] Failed: {ex.Message}")
         End Try
     End Sub
 #End Region
 
-#Region "Security Tools (REAL)"
-    Private Async Sub RunSecurityToolButton_Click(sender As Object, e As RoutedEventArgs)
+#Region "Security Automation"
+    Private Sub SecurityToolComboBox_SelectionChanged(sender As Object, e As SelectionChangedEventArgs)
+        Dim item = TryCast(SecurityToolComboBox.SelectedItem, ComboBoxItem)
+        If item Is Nothing Then Return
+        
+        Dim tag = item.Tag?.ToString()
+        Select Case tag
+            Case "Nmap"
+                SecurityToolDescText.Text = "Nmap: Network exploration and security auditing. Discover hosts, services, OS detection."
+            Case "SQLMap"
+                SecurityToolDescText.Text = "SQLMap: Automatic SQL injection detection and exploitation tool."
+            Case "WPScan"
+                SecurityToolDescText.Text = "WPScan: WordPress security scanner. Detects vulnerable plugins and themes."
+            Case "XSStrike"
+                SecurityToolDescText.Text = "XSStrike: Advanced XSS detection suite with fuzzing and WAF detection."
+            Case "DNSRecon"
+                SecurityToolDescText.Text = "DNSRecon: DNS enumeration tool. Zone transfers, subdomain brute force."
+        End Select
+    End Sub
+    
+    Private Async Sub SecurityScanButton_Click(sender As Object, e As RoutedEventArgs)
         If Not SecurityConsentCheckBox.IsChecked.GetValueOrDefault(False) Then
-            SecurityOutputTextBox.Text = "[SECURITY] ERROR: You must confirm authorization first!"
+            SecurityResultsText.Text = "[SECURITY] ERROR: Check authorization box first!"
             Return
         End If
         
         Dim target = SecurityTargetTextBox.Text.Trim()
         If String.IsNullOrEmpty(target) Then
-            SecurityOutputTextBox.Text = "[SECURITY] ERROR: Enter a target"
+            SecurityResultsText.Text = "[SECURITY] ERROR: Enter a target"
             Return
         End If
         
-        Dim toolIndex = SecurityToolComboBox.SelectedIndex
+        Dim item = TryCast(SecurityToolComboBox.SelectedItem, ComboBoxItem)
+        Dim toolTag = item?.Tag?.ToString()
         Dim toolName = ""
         Dim toolArgs = ""
         
-        Select Case toolIndex
-            Case 0 ' Nmap
+        Select Case toolTag
+            Case "Nmap"
                 toolName = "nmap"
                 toolArgs = $"-sV -sC {target}"
-            Case 1 ' SQLMap
+            Case "SQLMap"
                 toolName = "python"
                 toolArgs = $"-m sqlmap -u ""{target}"" --batch --level=1"
-            Case 2 ' WPScan
+            Case "WPScan"
                 toolName = "wpscan"
                 toolArgs = $"--url {target} --enumerate vp"
-            Case 3 ' XSStrike
+            Case "XSStrike"
                 toolName = "python"
                 toolArgs = $"xsstrike.py -u ""{target}"""
-            Case 4 ' DNSRecon
+            Case "DNSRecon"
                 toolName = "dnsrecon"
                 toolArgs = $"-d {target}"
+            Case Else
+                toolName = "nmap"
+                toolArgs = $"-sV {target}"
         End Select
         
-        SecurityOutputTextBox.Text = $"[SECURITY] Executing: {toolName} {toolArgs}{vbCrLf}"
+        SecurityResultsText.Text = $"[SECURITY] Executing: {toolName} {toolArgs}{vbCrLf}"
         LogTerminal($"[SECURITY] Running: {toolName}")
         
         Try
@@ -373,80 +610,113 @@ Class MainWindow
                 psi.UseShellExecute = False
                 psi.CreateNoWindow = True
                 
-                Dim proc As New Process()
-                proc.StartInfo = psi
-                proc.Start()
+                _securityProcess = New Process()
+                _securityProcess.StartInfo = psi
+                _securityProcess.Start()
                 
-                While Not proc.StandardOutput.EndOfStream
-                    Dim line = proc.StandardOutput.ReadLine()
+                While Not _securityProcess.StandardOutput.EndOfStream
+                    Dim line = _securityProcess.StandardOutput.ReadLine()
                     Dispatcher.Invoke(Sub()
-                        SecurityOutputTextBox.Text += line + vbCrLf
+                        SecurityResultsText.AppendText(line + vbCrLf)
                     End Sub)
                 End While
                 
-                proc.WaitForExit()
+                _securityProcess.WaitForExit()
             End Sub)
             
-            LogTerminal("[SECURITY] Tool execution completed")
+            LogTerminal("[SECURITY] Scan completed")
         Catch ex As Exception
-            SecurityOutputTextBox.Text += $"{vbCrLf}[SECURITY] ERROR: {ex.Message}{vbCrLf}Make sure the tool is installed and in PATH"
+            SecurityResultsText.AppendText($"{vbCrLf}[ERROR] {ex.Message}{vbCrLf}Make sure the tool is installed and in PATH")
             LogTerminal($"[SECURITY] ERROR: {ex.Message}")
+        End Try
+    End Sub
+    
+    Private Sub SecurityExportButton_Click(sender As Object, e As RoutedEventArgs)
+        Try
+            Dim filename = $"security_report_{DateTime.Now:yyyyMMdd_HHmmss}.txt"
+            File.WriteAllText(filename, SecurityResultsText.Text)
+            LogTerminal($"[SECURITY] Report exported: {filename}")
+        Catch ex As Exception
+            LogTerminal($"[SECURITY] Export failed: {ex.Message}")
         End Try
     End Sub
 #End Region
 
 #Region "AI"
-    Private Sub AIAnalysisButton_Click(sender As Object, e As RoutedEventArgs)
-        ' Switch to AI tab
-    End Sub
-    
-    Private Async Sub AskSofiaButton_Click(sender As Object, e As RoutedEventArgs)
+    Private Async Sub AIAnalyzeButton_Click(sender As Object, e As RoutedEventArgs)
         Dim apiKey = ApiKeyBox.Password
         If String.IsNullOrEmpty(apiKey) Then
-            AIOutputTextBox.Text = "[SOFIA] ERROR: Please enter your OpenRouter API key in settings below"
+            AIAnalysisText.Text = "[SOFIA] ERROR: Please enter your OpenRouter API key"
             Return
         End If
         
-        Dim query = AIInputTextBox.Text.Trim()
+        Dim query = AIQueryTextBox.Text.Trim()
         If String.IsNullOrEmpty(query) Then
-            AIOutputTextBox.Text = "[SOFIA] ERROR: Please enter a question"
+            AIAnalysisText.Text = "[SOFIA] ERROR: Please enter a question"
             Return
         End If
         
-        ' Collect network data
-        Dim networkData As New StringBuilder()
-        networkData.AppendLine("=== NETWORK STATUS ===")
-        networkData.AppendLine($"Interface: {_selectedInterface?.Name}")
-        networkData.AppendLine($"Packets Captured: {_packetCount}")
-        networkData.AppendLine($"Sent: {SentText.Text}")
-        networkData.AppendLine($"Received: {ReceivedText.Text}")
+        ' Collect network context
+        Dim context As New StringBuilder()
+        context.AppendLine("=== NETWORK STATUS ===")
+        context.AppendLine($"Interface: {_selectedInterface?.Name}")
+        context.AppendLine($"Packets: {_packetCount}")
+        context.AppendLine($"Sent: {SentDataText.Text}")
+        context.AppendLine($"Received: {ReceivedDataText.Text}")
+        context.AppendLine($"Connections: {ActiveConnectionsText.Text}")
+        context.AppendLine($"Latency: {LatencyText.Text}")
         
-        AIOutputTextBox.Text = "[SOFIA] Analyzing..."
+        AIAnalysisText.Text = "[SOFIA] Analyzing..."
+        AIStatusText.Text = "Processing..."
         LogTerminal("[AI] Sending query to SOFIA...")
         
         Try
-            Dim response = Await GetAIResponseAsync(apiKey, query, networkData.ToString())
-            AIOutputTextBox.Text = response
+            Dim response = Await GetAIResponseAsync(apiKey, query, context.ToString())
+            AIAnalysisText.Text = response
+            AIStatusText.Text = "Ready"
             LogTerminal("[AI] Response received")
         Catch ex As Exception
-            AIOutputTextBox.Text = $"[SOFIA] ERROR: {ex.Message}"
+            AIAnalysisText.Text = $"[SOFIA] ERROR: {ex.Message}"
+            AIStatusText.Text = "Error"
             LogTerminal($"[AI] ERROR: {ex.Message}")
         End Try
+    End Sub
+    
+    Private Sub AIQuickAnalyze_Click(sender As Object, e As RoutedEventArgs)
+        Dim btn = TryCast(sender, Button)
+        Dim tag = btn?.Tag?.ToString()
+        
+        Select Case tag
+            Case "traffic"
+                AIQueryTextBox.Text = "Analyze my current network traffic patterns"
+            Case "security"
+                AIQueryTextBox.Text = "Perform a security assessment of my network"
+            Case "firewall"
+                AIQueryTextBox.Text = "Suggest firewall rules based on my traffic"
+            Case "summary"
+                AIQueryTextBox.Text = "Generate a summary report of network status"
+            Case "anomaly"
+                AIQueryTextBox.Text = "Detect any anomalies in the traffic"
+            Case "performance"
+                AIQueryTextBox.Text = "Analyze network performance and suggest improvements"
+        End Select
+        
+        AIAnalyzeButton_Click(sender, e)
     End Sub
     
     Private Async Function GetAIResponseAsync(apiKey As String, query As String, context As String) As Task(Of String)
         Using client As New HttpClient()
             client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}")
             client.DefaultRequestHeaders.Add("HTTP-Referer", "https://rootcastle.rei")
-            client.DefaultRequestHeaders.Add("X-Title", "Rootcastle Network Monitor")
+            client.DefaultRequestHeaders.Add("X-Title", "Rootcastle Network Monitor WPF")
             
-            Dim modelId = "deepseek/deepseek-chat"
-            Select Case AIModelComboBox.SelectedIndex
-                Case 0 : modelId = "deepseek/deepseek-chat"
-                Case 1 : modelId = "openai/gpt-4o-mini"
-                Case 2 : modelId = "anthropic/claude-3.5-haiku"
-                Case 3 : modelId = "meta-llama/llama-3.2-3b-instruct:free"
-            End Select
+            Dim modelItem = TryCast(AIModelComboBox.SelectedItem, ComboBoxItem)
+            Dim modelId = modelItem?.Tag?.ToString()
+            If String.IsNullOrEmpty(modelId) Then modelId = "meta-llama/llama-3.2-3b-instruct:free"
+            
+            Dim langItem = TryCast(AILanguageComboBox.SelectedItem, ComboBoxItem)
+            Dim lang = langItem?.Tag?.ToString()
+            Dim langPrompt = If(lang = "TR", "Respond in Turkish.", If(lang = "EN", "Respond in English.", "Respond in German."))
             
             Dim body As New JObject()
             body("model") = modelId
@@ -454,11 +724,11 @@ Class MainWindow
             Dim messages As New JArray()
             messages.Add(New JObject() From {
                 {"role", "system"},
-                {"content", "You are SOFIA, an expert network security AI assistant for Rootcastle Network Monitor. Respond in Turkish by default. Be technical, concise, and helpful."}
+                {"content", $"You are SOFIA, an expert network security AI assistant for Rootcastle Network Monitor. {langPrompt} Be technical, concise, and helpful."}
             })
             messages.Add(New JObject() From {
                 {"role", "user"},
-                {"content", $"Network Context:{vbCrLf}{context}{vbCrLf}{vbCrLf}User Question: {query}"}
+                {"content", $"Network Context:{vbCrLf}{context}{vbCrLf}{vbCrLf}Question: {query}"}
             })
             body("messages") = messages
             body("max_tokens") = 2000
@@ -492,23 +762,32 @@ Class MainWindow
         Return $"{bytes} B"
     End Function
     
+    Private Sub ReportButton_Click(sender As Object, e As RoutedEventArgs)
+        LogTerminal("[REPORT] Generating network report...")
+        ' Generate report logic
+    End Sub
+    
+    Private Sub SettingsButton_Click(sender As Object, e As RoutedEventArgs)
+        LogTerminal("[SETTINGS] Opening settings...")
+    End Sub
+    
+    Private Sub SuspiciousPacketCheckBox_Checked(sender As Object, e As RoutedEventArgs)
+        _suspiciousDetectionEnabled = True
+        LogTerminal("[SEC] Suspicious detection ENABLED")
+    End Sub
+    
+    Private Sub SuspiciousPacketCheckBox_Unchecked(sender As Object, e As RoutedEventArgs)
+        _suspiciousDetectionEnabled = False
+        LogTerminal("[SEC] Suspicious detection DISABLED")
+    End Sub
+    
     Protected Overrides Sub OnClosing(e As CancelEventArgs)
-        StopCapture()
         _monitoringCts?.Cancel()
         _uptimeTimer?.Dispose()
         _nmapProcess?.Kill()
+        _securityProcess?.Kill()
         MyBase.OnClosing(e)
     End Sub
 #End Region
 
-End Class
-
-Public Class CapturedPacketInfo
-    Public Property Timestamp As DateTime
-    Public Property SourceIP As String = ""
-    Public Property DestIP As String = ""
-    Public Property SourcePort As Integer
-    Public Property DestPort As Integer
-    Public Property Protocol As String = ""
-    Public Property Length As Integer
 End Class

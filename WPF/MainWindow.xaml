@@ -1,0 +1,335 @@
+﻿<Window x:Class="MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Rootcastle Network Monitor v6.0 - Defense Grade" Height="900" Width="1400" Background="#0A0A0A" WindowStartupLocation="CenterScreen" Loaded="Window_Loaded">
+
+    <Window.Resources>
+        <!-- Matrix Theme Styles -->
+        <Style x:Key="MatrixBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="#050505"/>
+            <Setter Property="BorderBrush" Value="#00FF00"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="Margin" Value="4"/>
+        </Style>
+
+        <Style x:Key="MatrixButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#001100"/>
+            <Setter Property="Foreground" Value="#00FF00"/>
+            <Setter Property="BorderBrush" Value="#00FF00"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style x:Key="AlertButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#330000"/>
+            <Setter Property="Foreground" Value="#FF4444"/>
+            <Setter Property="BorderBrush" Value="#FF4444"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style x:Key="MatrixTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Background" Value="#001100"/>
+            <Setter Property="Foreground" Value="#00FF00"/>
+            <Setter Property="BorderBrush" Value="#00AA00"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="Padding" Value="8,6"/>
+        </Style>
+
+        <Style x:Key="MatrixComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Background" Value="#001100"/>
+            <Setter Property="Foreground" Value="#00FF00"/>
+            <Setter Property="BorderBrush" Value="#00AA00"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="380"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Grid.ColumnSpan="2" Background="#001500" BorderBrush="#00FF00" BorderThickness="0,0,0,3" Padding="15,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal">
+                    <Image Source="logo.png" Width="48" Height="48" Margin="0,0,12,0"/>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="ROOTCASTLE NETWORK MONITOR" FontSize="20" FontWeight="Bold" Foreground="#00FF00" FontFamily="Consolas"/>
+                        <TextBlock Text="WPF Edition • Full System Access • SOFIA AI Inside" FontSize="11" Foreground="#008800" FontFamily="Consolas"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <ComboBox x:Name="InterfaceComboBox" Width="200" Style="{StaticResource MatrixComboBoxStyle}" Margin="0,0,8,0" SelectionChanged="InterfaceComboBox_SelectionChanged"/>
+                    <Button x:Name="StartButton" Content="▶ START" Style="{StaticResource MatrixButtonStyle}" Click="StartButton_Click" Margin="0,0,8,0"/>
+                    <Button Content="🧠 AI ANALYSIS" Style="{StaticResource MatrixButtonStyle}" Click="AIAnalysisButton_Click" Margin="0,0,8,0"/>
+                    <Button Content="🔍 NMAP SCAN" Style="{StaticResource AlertButtonStyle}" Click="NmapScanButton_Click" Margin="0,0,8,0"/>
+                    <Button Content="📦 CAPTURE" Style="{StaticResource MatrixButtonStyle}" Click="CaptureButton_Click"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock x:Name="StatusIndicator" Text="●" Foreground="#FFAA00" FontSize="20" Margin="0,0,8,0"/>
+                    <StackPanel>
+                        <TextBlock x:Name="PacketCountText" Text="0" Foreground="#00FFFF" FontFamily="Consolas" FontSize="16" FontWeight="Bold"/>
+                        <TextBlock Text="packets" Foreground="#006666" FontFamily="Consolas" FontSize="10"/>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main Content -->
+        <TabControl Grid.Row="1" Grid.Column="0" Background="#0A0A0A" BorderBrush="#00FF00" Margin="4">
+            <!-- Monitor Tab -->
+            <TabItem Header="📊 MONITOR" Foreground="#00FF00" Background="#001100">
+                <ScrollViewer>
+                    <StackPanel Margin="8">
+                        <!-- Statistics -->
+                        <Border Style="{StaticResource MatrixBorderStyle}">
+                            <StackPanel>
+                                <TextBlock Text="► REAL-TIME STATISTICS" FontSize="14" Foreground="#00FF00" FontFamily="Consolas" FontWeight="Bold" Margin="0,0,0,10"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel HorizontalAlignment="Center">
+                                        <TextBlock Text="SENT" Foreground="#888888" FontFamily="Consolas" FontSize="11"/>
+                                        <TextBlock x:Name="SentText" Text="0 B" Foreground="#00FF00" FontFamily="Consolas" FontSize="18" FontWeight="Bold"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                                        <TextBlock Text="RECEIVED" Foreground="#888888" FontFamily="Consolas" FontSize="11"/>
+                                        <TextBlock x:Name="ReceivedText" Text="0 B" Foreground="#00FFFF" FontFamily="Consolas" FontSize="18" FontWeight="Bold"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                                        <TextBlock Text="LATENCY" Foreground="#888888" FontFamily="Consolas" FontSize="11"/>
+                                        <TextBlock x:Name="LatencyText" Text="0 ms" Foreground="#FFAA00" FontFamily="Consolas" FontSize="18" FontWeight="Bold"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="3" HorizontalAlignment="Center">
+                                        <TextBlock Text="LOSS" Foreground="#888888" FontFamily="Consolas" FontSize="11"/>
+                                        <TextBlock x:Name="LossText" Text="0%" Foreground="#FF4444" FontFamily="Consolas" FontSize="18" FontWeight="Bold"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Packet Capture (REAL) -->
+                        <Border Style="{StaticResource MatrixBorderStyle}" BorderBrush="#00CCFF">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <TextBlock Text="► LIVE PACKET CAPTURE" FontSize="14" Foreground="#00CCFF" FontFamily="Consolas" FontWeight="Bold"/>
+                                    <Border Background="#003366" CornerRadius="3" Margin="8,0,0,0" Padding="6,2">
+                                        <TextBlock Text="✓ REAL (Npcap)" FontSize="10" Foreground="#00CCFF"/>
+                                    </Border>
+                                </StackPanel>
+                                <ListBox x:Name="PacketListBox" Height="200" Background="#000510" Foreground="#00FF00" FontFamily="Consolas" FontSize="11"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Active Connections -->
+                        <Border Style="{StaticResource MatrixBorderStyle}">
+                            <StackPanel>
+                                <TextBlock Text="► ACTIVE CONNECTIONS" FontSize="14" Foreground="#00FF00" FontFamily="Consolas" FontWeight="Bold" Margin="0,0,0,10"/>
+                                <DataGrid x:Name="ConnectionsGrid" Height="150" Background="#000510" Foreground="#00FF00" FontFamily="Consolas" FontSize="11" AutoGenerateColumns="False" IsReadOnly="True">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Local" Binding="{Binding LocalEndpoint}" Width="150"/>
+                                        <DataGridTextColumn Header="Remote" Binding="{Binding RemoteEndpoint}" Width="150"/>
+                                        <DataGridTextColumn Header="State" Binding="{Binding State}" Width="100"/>
+                                        <DataGridTextColumn Header="PID" Binding="{Binding ProcessId}" Width="60"/>
+                                        <DataGridTextColumn Header="Process" Binding="{Binding ProcessName}" Width="*"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- NMAP Tab -->
+            <TabItem Header="🔍 NMAP" Foreground="#FF4444" Background="#330000">
+                <ScrollViewer>
+                    <StackPanel Margin="8">
+                        <Border Style="{StaticResource MatrixBorderStyle}" BorderBrush="#FF4444">
+                            <StackPanel>
+                                <TextBlock Text="► NMAP SCANNER (REAL)" FontSize="14" Foreground="#FF4444" FontFamily="Consolas" FontWeight="Bold" Margin="0,0,0,10"/>
+
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="NmapTargetTextBox" Style="{StaticResource MatrixTextBoxStyle}" Text="192.168.1.1"/>
+                                    <ComboBox x:Name="NmapScanTypeComboBox" Grid.Column="1" Style="{StaticResource MatrixComboBoxStyle}" Width="150" Margin="8,0">
+                                        <ComboBoxItem Content="Quick Scan (-sT)" IsSelected="True"/>
+                                        <ComboBoxItem Content="Service Scan (-sV)"/>
+                                        <ComboBoxItem Content="OS Detection (-O)"/>
+                                        <ComboBoxItem Content="Aggressive (-A)"/>
+                                        <ComboBoxItem Content="Full Port (-p 1-65535)"/>
+                                    </ComboBox>
+                                    <Button x:Name="RunNmapButton" Grid.Column="2" Content="🚀 RUN NMAP" Style="{StaticResource AlertButtonStyle}" Click="RunNmapButton_Click"/>
+                                </Grid>
+
+                                <TextBox x:Name="NmapOutputTextBox" Height="400" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Background="#000510" Foreground="#00FF00" FontFamily="Consolas" FontSize="11" Text="[NMAP] Ready. Enter target and click RUN NMAP.&#x0a;Requires: nmap installed in PATH"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Security Tools Tab -->
+            <TabItem Header="🛡️ SECURITY TOOLS" Foreground="#FF6600" Background="#331100">
+                <ScrollViewer>
+                    <StackPanel Margin="8">
+                        <!-- Legal Warning -->
+                        <Border Background="#331100" BorderBrush="#FF4400" BorderThickness="3" CornerRadius="8" Padding="16" Margin="0,0,0,8">
+                            <TextBlock TextWrapping="Wrap" Foreground="#FFAA00" FontFamily="Consolas" FontSize="11">
+                                ⚠️ LEGAL WARNING: Only use these tools on systems you own or have written permission to test.
+                                Unauthorized scanning is illegal under CFAA, EU Directive, and local laws.
+                            </TextBlock>
+                        </Border>
+
+                        <Border Style="{StaticResource MatrixBorderStyle}" BorderBrush="#FF6600">
+                            <StackPanel>
+                                <TextBlock Text="► FSOCIETY TOOLS (REAL EXECUTION)" FontSize="14" Foreground="#FF6600" FontFamily="Consolas" FontWeight="Bold" Margin="0,0,0,10"/>
+
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="Tool:" Foreground="#888888" FontFamily="Consolas" FontSize="11"/>
+                                        <ComboBox x:Name="SecurityToolComboBox" Style="{StaticResource MatrixComboBoxStyle}">
+                                            <ComboBoxItem Content="🔍 Nmap - Network Scanner" IsSelected="True"/>
+                                            <ComboBoxItem Content="💉 SQLMap - SQL Injection"/>
+                                            <ComboBoxItem Content="📝 WPScan - WordPress"/>
+                                            <ComboBoxItem Content="⚡ XSStrike - XSS Detection"/>
+                                            <ComboBoxItem Content="🌐 DNSRecon - DNS Enum"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                        <TextBlock Text="Target:" Foreground="#888888" FontFamily="Consolas" FontSize="11"/>
+                                        <TextBox x:Name="SecurityTargetTextBox" Style="{StaticResource MatrixTextBoxStyle}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <CheckBox x:Name="SecurityConsentCheckBox" Foreground="#FFAA00" FontFamily="Consolas" Margin="0,0,0,10">
+                                    <TextBlock TextWrapping="Wrap">I confirm I have authorization to test this target</TextBlock>
+                                </CheckBox>
+
+                                <Button x:Name="RunSecurityToolButton" Content="🚀 EXECUTE TOOL" Style="{StaticResource AlertButtonStyle}" Click="RunSecurityToolButton_Click"/>
+
+                                <TextBox x:Name="SecurityOutputTextBox" Height="300" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Margin="0,10,0,0" Background="#000510" Foreground="#00FF00" FontFamily="Consolas" FontSize="11" Text="[SECURITY] Ready. Select tool, enter target, confirm authorization, and execute."/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- AI Tab -->
+            <TabItem Header="🧠 SOFIA AI" Foreground="#00CCFF" Background="#001133">
+                <ScrollViewer>
+                    <StackPanel Margin="8">
+                        <Border Style="{StaticResource MatrixBorderStyle}" BorderBrush="#00CCFF">
+                            <StackPanel>
+                                <TextBlock Text="► SOFIA AI ASSISTANT" FontSize="14" Foreground="#00CCFF" FontFamily="Consolas" FontWeight="Bold" Margin="0,0,0,10"/>
+
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="AIInputTextBox" Style="{StaticResource MatrixTextBoxStyle}" Text="Analyze my network security..."/>
+                                    <Button Grid.Column="1" Content="🧠 ASK SOFIA" Style="{StaticResource MatrixButtonStyle}" Click="AskSofiaButton_Click" Margin="8,0,0,0"/>
+                                </Grid>
+
+                                <TextBox x:Name="AIOutputTextBox" Height="400" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Background="#001520" Foreground="#00CCFF" FontFamily="Consolas" FontSize="12" Text="[SOFIA] Merhaba! Ben SOFIA, ağ güvenliği AI asistanınızım.&#x0a;&#x0a;Şu konularda yardımcı olabilirim:&#x0a;• Trafik analizi ve anomali tespiti&#x0a;• Güvenlik risk değerlendirmesi&#x0a;• NMAP sonuç yorumlama&#x0a;• Tehdit avlama&#x0a;&#x0a;Nasıl yardımcı olabilirim?"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource MatrixBorderStyle}">
+                            <StackPanel>
+                                <TextBlock Text="► AI SETTINGS" FontSize="14" Foreground="#00FF00" FontFamily="Consolas" FontWeight="Bold" Margin="0,0,0,10"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="API Key:" Foreground="#888888" FontFamily="Consolas" FontSize="11"/>
+                                        <PasswordBox x:Name="ApiKeyBox" Background="#001100" Foreground="#00FF00" FontFamily="Consolas" BorderBrush="#00AA00"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                        <TextBlock Text="Model:" Foreground="#888888" FontFamily="Consolas" FontSize="11"/>
+                                        <ComboBox x:Name="AIModelComboBox" Style="{StaticResource MatrixComboBoxStyle}">
+                                            <ComboBoxItem Content="DeepSeek V3" IsSelected="True"/>
+                                            <ComboBoxItem Content="GPT-4o Mini"/>
+                                            <ComboBoxItem Content="Claude 3.5 Haiku"/>
+                                            <ComboBoxItem Content="Llama 3.2 3B (Free)"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <!-- Terminal Panel -->
+        <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource MatrixBorderStyle}" Margin="4">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Border Background="#001500" Padding="10,6" Margin="-10,-10,-10,10">
+                    <Grid>
+                        <TextBlock Text="► TERMINAL OUTPUT" Foreground="#00FF00" FontFamily="Consolas" FontWeight="Bold" FontSize="12"/>
+                        <Button Content="CLEAR" HorizontalAlignment="Right" Style="{StaticResource MatrixButtonStyle}" Padding="8,2" Click="ClearTerminalButton_Click"/>
+                    </Grid>
+                </Border>
+
+                <ScrollViewer Grid.Row="1" x:Name="TerminalScrollViewer">
+                    <TextBlock x:Name="TerminalOutput" Foreground="#00FF00" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap" Text="[SYSTEM] Rootcastle Network Monitor v6.0 WPF Edition&#x0a;[SYSTEM] Full system access enabled&#x0a;[SYSTEM] SharpPcap packet capture ready&#x0a;[SYSTEM] Waiting for interface selection..."/>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+
+        <!-- Status Bar -->
+        <Border Grid.Row="2" Grid.ColumnSpan="2" Background="#001500" BorderBrush="#00FF00" BorderThickness="0,1,0,0" Padding="10,5">
+            <Grid>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock x:Name="StatusText" Text="[READY]" Foreground="#00FF00" FontFamily="Consolas" FontSize="11"/>
+                    <TextBlock Text=" | " Foreground="#004400"/>
+                    <TextBlock x:Name="UptimeText" Text="Uptime: 00:00:00" Foreground="#00AA00" FontFamily="Consolas" FontSize="11"/>
+                </StackPanel>
+                <TextBlock Text="Rootcastle Engineering &amp; Innovation • WPF Edition" Foreground="#004400" FontFamily="Consolas" FontSize="10" HorizontalAlignment="Right"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
